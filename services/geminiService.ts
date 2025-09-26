@@ -89,9 +89,6 @@ export async function sendChatMessage(
         startChat();
     }
     
-    // FIX: The `chat.sendMessage` method expects an array of `Part`s directly,
-    // not an object with a `contents` property as was previously passed.
-    // The variable has been renamed from `contents` to `parts` for clarity.
     const parts: Part[] = [];
     if (image) {
         parts.push({
@@ -103,7 +100,9 @@ export async function sendChatMessage(
     }
     parts.push({ text: message });
 
-    const response = await chat.sendMessage(parts);
+    // FIX: The `chat.sendMessage` method expects an object with a `message`
+    // property containing the parts, not the parts array directly.
+    const response = await chat.sendMessage({ message: parts });
     
     try {
         const jsonText = response.text.trim();
