@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 
 // Polyfill for browser compatibility
@@ -20,7 +19,7 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     setIsAvailable(true);
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false; // Stop after a pause
+    recognition.continuous = true; // Enable continuous listening
     recognition.lang = 'it-IT';
     recognition.interimResults = false;
 
@@ -28,7 +27,6 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     recognition.onresult = (event: any) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim();
       onTranscript(transcript);
-      stopListening();
     };
 
     // FIX: Use `any` for the event type to fix "Cannot find name 'SpeechRecognitionErrorEvent'" error.
@@ -38,6 +36,8 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     };
 
     recognition.onend = () => {
+      // The recognition service can end for various reasons (e.g., timeout, network error).
+      // This ensures the UI state is always synchronized with the actual recognition state.
       setIsListening(false);
     };
 

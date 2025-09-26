@@ -18,10 +18,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const handleTranscript = (transcript: string) => {
-    setInputText(transcript);
+    setInputText(prev => (prev.trim() ? prev.trim() + ' ' : '') + transcript);
   };
 
-  const { isListening, isAvailable, startListening } = useVoiceRecognition(handleTranscript);
+  const { isListening, isAvailable, startListening, stopListening } = useVoiceRecognition(handleTranscript);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,6 +54,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+    }
+  };
+
+  const handleMicClick = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
     }
   };
 
@@ -112,7 +120,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             <PaperclipIcon className="w-6 h-6" />
           </label>
            {isAvailable && (
-             <button type="button" onClick={startListening} disabled={isListening} className={`p-2 rounded-full hover:bg-jarvis-surface transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-jarvis-text-secondary hover:text-jarvis-primary'}`}>
+             <button type="button" onClick={handleMicClick} className={`p-2 rounded-full hover:bg-jarvis-surface transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-jarvis-text-secondary hover:text-jarvis-primary'}`}>
                 <MicrophoneIcon className="w-6 h-6" />
              </button>
            )}
