@@ -9,6 +9,8 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
   const [isAvailable, setIsAvailable] = useState(false);
   // FIX: Use `any` for the ref type to avoid needing to define the full SpeechRecognition interface.
   const recognitionRef = useRef<any | null>(null);
+  // This ref is crucial to distinguish between a manual stop and a browser timeout.
+  const userStoppedRef = useRef(false);
 
   useEffect(() => {
     if (!SpeechRecognition) {
@@ -19,7 +21,7 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     setIsAvailable(true);
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true; // Enable continuous listening
+    recognition.continuous = true;
     recognition.lang = 'it-IT';
     recognition.interimResults = false;
 
@@ -32,17 +34,27 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     // FIX: Use `any` for the event type to fix "Cannot find name 'SpeechRecognitionErrorEvent'" error.
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error', event.error);
-      stopListening();
+      // On critical error, stop trying to listen.
+      userStoppedRef.current = true;
+      setIsListening(false);
     };
 
     recognition.onend = () => {
-      // The recognition service can end for various reasons (e.g., timeout, network error).
-      // This ensures the UI state is always synchronized with the actual recognition state.
-      setIsListening(false);
+      // This is the core logic for the on/off toggle.
+      // If recognition stops but the user didn't manually stop it, restart it.
+      if (!userStoppedRef.current) {
+        try {
+          recognition.start(); // Auto-restart on timeout
+        } catch (error) {
+          console.error('Failed to auto-restart recognition:', error);
+          setIsListening(false); // Sync UI if restart fails
+        }
+      }
     };
 
     recognitionRef.current = recognition;
 
+    // Cleanup on component unmount
     return () => {
       recognition.stop();
     };
@@ -52,6 +64,7 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
   const startListening = () => {
     if (recognitionRef.current && !isListening) {
       try {
+        userStoppedRef.current = false;
         recognitionRef.current.start();
         setIsListening(true);
       } catch (error) {
@@ -63,10 +76,12 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
   const stopListening = () => {
     if (recognitionRef.current && isListening) {
        try {
+        userStoppedRef.current = true; // Signal a manual stop
         recognitionRef.current.stop();
         setIsListening(false);
       } catch (error) {
         console.error("Could not stop recognition", error);
+        setIsListening(false); // Ensure state is synced on error
       }
     }
   };
