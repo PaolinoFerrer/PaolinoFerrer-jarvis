@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Report } from '../types.ts';
 import { DownloadIcon } from './icons.tsx';

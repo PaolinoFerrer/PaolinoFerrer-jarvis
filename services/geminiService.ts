@@ -1,5 +1,4 @@
-
-import { GoogleGenAI, Chat, Type } from "@google/genai";
+import { GoogleGenAI, Chat, Type, Part } from "@google/genai";
 import { Report } from '../types.ts';
 
 if (!process.env.API_KEY) {
@@ -90,18 +89,21 @@ export async function sendChatMessage(
         startChat();
     }
     
-    const contents = [];
+    // FIX: The `chat.sendMessage` method expects an array of `Part`s directly,
+    // not an object with a `contents` property as was previously passed.
+    // The variable has been renamed from `contents` to `parts` for clarity.
+    const parts: Part[] = [];
     if (image) {
-        contents.push({
+        parts.push({
             inlineData: {
                 mimeType: image.mimeType,
                 data: image.data,
             },
         });
     }
-    contents.push({ text: message });
+    parts.push({ text: message });
 
-    const response = await chat.sendMessage({ message: contents });
+    const response = await chat.sendMessage(parts);
     
     try {
         const jsonText = response.text.trim();

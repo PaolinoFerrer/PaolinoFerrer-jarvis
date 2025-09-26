@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from '../types.ts';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition.ts';
