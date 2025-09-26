@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import ChatInterface from './components/ChatInterface.tsx';
 import ReportView from './components/ReportView.tsx';
