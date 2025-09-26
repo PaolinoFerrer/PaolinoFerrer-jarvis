@@ -99,7 +99,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             </button>
           </div>
         )}
-        <div className="flex items-center gap-2 bg-jarvis-bg rounded-lg p-2">
+        <div className="flex items-center gap-3 bg-jarvis-bg rounded-lg p-2">
           <input
             type="file"
             ref={fileInputRef}
@@ -112,9 +112,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             <PaperclipIcon className="w-6 h-6" />
           </label>
            {isAvailable && (
-             <button type="button" onClick={toggleListening} className={`p-2 rounded-full hover:bg-jarvis-surface transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-jarvis-text-secondary hover:text-jarvis-primary'}`}>
-                <MicrophoneIcon className="w-6 h-6" />
-             </button>
+             <div className="flex items-center gap-2">
+                <MicrophoneIcon className={`w-6 h-6 transition-colors ${isListening ? 'text-green-500' : 'text-jarvis-text-secondary'}`} />
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-jarvis-primary focus:ring-offset-2 focus:ring-offset-jarvis-bg ${isListening ? 'bg-green-500' : 'bg-red-600'}`}
+                  role="switch"
+                  aria-checked={isListening}
+                  aria-label="Toggle Microphone"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isListening ? 'translate-x-5' : 'translate-x-0'}`}
+                  />
+                </button>
+             </div>
            )}
           <textarea
             rows={1}

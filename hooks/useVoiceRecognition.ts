@@ -8,8 +8,8 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
   const [isAvailable, setIsAvailable] = useState(false);
   
   const recognitionRef = useRef<any | null>(null);
-  // This ref will hold the current listening state to avoid stale closures in event handlers.
-  const isListeningRef = useRef(false);
+  // This ref is crucial to differentiate between a user-initiated stop and a browser timeout.
+  const userStoppedRef = useRef(false);
 
   // Initialize the SpeechRecognition object only once.
   useEffect(() => {
@@ -21,13 +21,12 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     setIsAvailable(true);
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true; // Keep listening even after a pause
+    recognition.continuous = true;
     recognition.lang = 'it-IT';
-    recognition.interimResults = false; // We only want final results
+    recognition.interimResults = false;
 
     recognition.onresult = (event: any) => {
       let finalTranscript = '';
-      // Accumulate final results
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           finalTranscript += event.results[i][0].transcript.trim() + ' ';
@@ -40,27 +39,23 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
-      // On any error, we must stop and reflect this in the UI.
-      if (isListeningRef.current) {
-        isListeningRef.current = false;
-        setIsListening(false);
-      }
+      // On any error, ensure we are in a stopped state.
+      userStoppedRef.current = true; // Prevent any restart attempts on error
+      setIsListening(false);
     };
     
     recognition.onend = () => {
       console.log("Recognition service ended.");
-      // If the service ends but our state/intent is still 'listening', it means
-      // it timed out. We should restart it.
-      if (isListeningRef.current) {
+      // If the service ended but our intent was to keep listening (i.e., user did not stop it),
+      // it means it timed out or had a network issue. We should restart it.
+      if (!userStoppedRef.current) {
         console.log("Restarting recognition service...");
         try {
           recognition.start();
         } catch (e) {
             console.error("Error restarting recognition:", e);
-            if (isListeningRef.current) {
-              isListeningRef.current = false;
-              setIsListening(false);
-            }
+            // If restart fails, truly stop and update UI.
+            setIsListening(false);
         }
       }
     };
@@ -70,36 +65,36 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     // Cleanup on unmount
     return () => {
       if (recognitionRef.current) {
-        isListeningRef.current = false; // Prevent any restarts
-        recognitionRef.current.abort(); // Forcefully stop
+        userStoppedRef.current = true; // Prevent any restarts during cleanup
+        recognitionRef.current.abort();
       }
     };
   }, [onTranscript]);
 
-  // This is the single control function for the user.
   const toggleListening = useCallback(() => {
     if (!isAvailable || !recognitionRef.current) {
         console.warn("Speech recognition not available or not initialized.");
         return;
     }
     
-    // We toggle the state and the ref, then issue the command.
     const shouldBeListening = !isListening;
     setIsListening(shouldBeListening);
-    isListeningRef.current = shouldBeListening;
 
     if (shouldBeListening) {
       console.log("User command: START listening.");
+      // Signal that any 'onend' event from now on is not user-initiated.
+      userStoppedRef.current = false;
       try {
         recognitionRef.current.start();
       } catch (e) {
         console.error("Could not start recognition:", e);
         // If it fails to start, revert the state.
         setIsListening(false);
-        isListeningRef.current = false;
       }
     } else {
       console.log("User command: STOP listening.");
+      // Signal that the upcoming 'onend' event IS user-initiated and should not trigger a restart.
+      userStoppedRef.current = true;
       recognitionRef.current.stop();
     }
   }, [isListening, isAvailable]);
