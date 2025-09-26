@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import ChatInterface from './components/ChatInterface';
-import ReportView from './components/ReportView';
-import { ChatMessage, Report } from './types';
-import { sendChatMessage, startChat } from './services/geminiService';
-import { BrainCircuitIcon } from './components/icons';
+import ChatInterface from './components/ChatInterface.tsx';
+import ReportView from './components/ReportView.tsx';
+import { ChatMessage, Report } from './types.ts';
+import { sendChatMessage, startChat } from './services/geminiService.ts';
+import { BrainCircuitIcon } from './components/icons.tsx';
 
 const fileToBase64 = (file: File): Promise<{mimeType: string, data: string}> => {
   return new Promise((resolve, reject) => {

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Chat, Type } from "@google/genai";
-import { Report } from '../types';
+import { Report } from '../types.ts';
 
 if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable not set");

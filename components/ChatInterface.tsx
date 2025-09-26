@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatMessage } from '../types';
-import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
-import { MicrophoneIcon, PaperclipIcon, SendIcon, BrainCircuitIcon } from './icons';
+import { ChatMessage } from '../types.ts';
+import { useVoiceRecognition } from '../hooks/useVoiceRecognition.ts';
+import { MicrophoneIcon, PaperclipIcon, SendIcon, BrainCircuitIcon } from './icons.tsx';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];

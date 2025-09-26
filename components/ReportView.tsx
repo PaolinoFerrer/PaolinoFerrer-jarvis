@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { Report } from '../types';
-import { DownloadIcon } from './icons';
+import { Report } from '../types.ts';
+import { DownloadIcon } from './icons.tsx';
 
 interface ReportViewProps {
   report: Report;
