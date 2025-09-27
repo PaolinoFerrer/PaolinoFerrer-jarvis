@@ -3,10 +3,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 // Polyfill for browser compatibility
 const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-export const useVoiceRecognition = (onTranscript: (transcript: string) => void) => {
+export const useVoiceRecognition = (onStop: (transcript: string) => void) => {
   const [isListening, setIsListening] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
   const recognitionRef = useRef<any | null>(null);
+  const transcriptRef = useRef<string>('');
 
   useEffect(() => {
     if (!SpeechRecognition) {
@@ -21,15 +22,17 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     recognition.lang = 'it-IT';
     recognition.interimResults = false;
 
-    // The component's state is now driven directly by the API's own events for maximum reliability.
     recognition.onstart = () => {
-      console.log('MANUAL CONTROL: Speech recognition started.');
+      transcriptRef.current = ''; // Clear previous transcript on start
       setIsListening(true);
     };
 
     recognition.onend = () => {
-      console.log('MANUAL CONTROL: Speech recognition ended (either by user or browser).');
       setIsListening(false);
+      // When recognition ends (manually or otherwise), call the onStop callback
+      if (transcriptRef.current) {
+        onStop(transcriptRef.current.trim());
+      }
     };
 
     recognition.onerror = (event: any) => {
@@ -38,26 +41,21 @@ export const useVoiceRecognition = (onTranscript: (transcript: string) => void) 
     };
 
     recognition.onresult = (event: any) => {
-      let finalTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript.trim() + ' ';
+          transcriptRef.current += event.results[i][0].transcript.trim() + ' ';
         }
-      }
-      if (finalTranscript) {
-        onTranscript(finalTranscript);
       }
     };
 
     recognitionRef.current = recognition;
 
-    // Cleanup on unmount
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
     };
-  }, [onTranscript]);
+  }, [onStop]);
 
   const startListening = useCallback(() => {
     if (isAvailable && recognitionRef.current && !isListening) {

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from '../types.ts';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition.ts';
-import { MicrophoneIcon, PaperclipIcon, SendIcon, BrainCircuitIcon } from './icons.tsx';
+import { MicrophoneIcon, PaperclipIcon, SendIcon, BrainCircuitIcon, StopIcon } from './icons.tsx';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
@@ -17,19 +17,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleTranscript = (transcript: string) => {
-    setInputText(prev => (prev.trim() ? prev.trim() + ' ' : '') + transcript);
-  };
-
-  const { isListening, isAvailable, startListening, stopListening } = useVoiceRecognition(handleTranscript);
-
-  const handleToggleMic = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
+  const handleVoiceSubmit = (transcript: string) => {
+    if (transcript.trim()) {
+      onSendMessage(transcript.trim());
     }
   };
+
+  const { isListening, isAvailable, startListening, stopListening } = useVoiceRecognition(handleVoiceSubmit);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -64,6 +58,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
       setFile(e.target.files[0]);
     }
   };
+
+  const handleMicButtonClick = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      setInputText(''); // Clear text input when starting voice
+      startListening();
+    }
+  }
 
   return (
     <div className="bg-jarvis-surface rounded-lg flex flex-col h-full overflow-hidden">
@@ -120,31 +123,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             <PaperclipIcon className="w-6 h-6" />
           </label>
            {isAvailable && (
-             <div className="flex items-center gap-2" title={isListening ? 'Spegni microfono' : 'Accendi microfono'}>
-                <MicrophoneIcon className={`w-6 h-6 transition-colors ${isListening ? 'text-green-500' : 'text-jarvis-text-secondary'}`} />
-                <button
-                  type="button"
-                  onClick={handleToggleMic}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-jarvis-primary focus:ring-offset-2 focus:ring-offset-jarvis-bg ${isListening ? 'bg-green-600' : 'bg-red-700'}`}
-                  role="switch"
-                  aria-checked={isListening}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isListening ? 'translate-x-5' : 'translate-x-0'}`}
-                  />
-                </button>
-             </div>
+             <button
+                type="button"
+                onClick={handleMicButtonClick}
+                title={isListening ? 'Ferma registrazione e invia' : 'Avvia registrazione'}
+                className={`p-3 rounded-full text-white transition-colors ${isListening ? 'bg-red-600 hover:bg-red-700' : 'bg-jarvis-primary hover:bg-jarvis-secondary'}`}
+             >
+                {isListening ? <StopIcon className="w-5 h-5" /> : <MicrophoneIcon className="w-5 h-5" />}
+             </button>
            )}
           <textarea
             rows={1}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder={isListening ? 'Sto ascoltando...' : 'Descrivi un rilievo o un\'area...'}
+            placeholder={isListening ? 'In ascolto...' : 'Descrivi un rilievo o un\'area...'}
             className="flex-1 bg-transparent focus:outline-none px-2 resize-none"
-            disabled={isLoading}
+            disabled={isLoading || isListening}
+            readOnly={isListening}
           />
-          <button type="submit" disabled={isLoading || (!inputText.trim() && !file)} className="p-3 rounded-full bg-jarvis-primary text-white disabled:bg-jarvis-text-secondary disabled:cursor-not-allowed hover:bg-jarvis-secondary transition-colors">
+          <button type="submit" disabled={isLoading || isListening || (!inputText.trim() && !file)} className="p-3 rounded-full bg-jarvis-primary text-white disabled:bg-jarvis-text-secondary disabled:cursor-not-allowed hover:bg-jarvis-secondary transition-colors">
             <SendIcon className="w-5 h-5" />
           </button>
         </div>
