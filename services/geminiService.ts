@@ -100,8 +100,7 @@ export async function sendChatMessage(
     }
     parts.push({ text: message });
 
-    // FIX: The `sendMessage` method expects an object with a `message` property that contains the parts.
-    const response = await chat.sendMessage({ message: parts });
+    const response = await chat.sendMessage(parts);
     
     try {
         const jsonText = response.text.trim();

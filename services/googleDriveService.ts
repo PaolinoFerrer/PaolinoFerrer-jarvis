@@ -5,17 +5,15 @@ declare const google: any;
 
 import { Report } from '../types.ts';
 
-// --- CONFIGURAZIONE OBBLIGATORIA ---
-// 1. Vai su https://console.cloud.google.com/apis/credentials
-// 2. Crea un "ID client OAuth 2.0" per un'"Applicazione web".
-//    - Aggiungi http://localhost:5173 (o l'URL dove esegui l'app) alle "Origini JavaScript autorizzate".
-// 3. Crea una "Chiave API".
-// 4. Incolla i valori qui sotto.
+if (!process.env.GOOGLE_DRIVE_API_KEY) {
+    throw new Error("GOOGLE_DRIVE_API_KEY environment variable not set. Please provide it to use Google Drive features.");
+}
+if (!process.env.GOOGLE_DRIVE_CLIENT_ID) {
+    throw new Error("GOOGLE_DRIVE_CLIENT_ID environment variable not set. Please provide it to use Google Drive features.");
+}
 
-const API_KEY = 'INSERISCI_LA_TUA_CHIAVE_API_DI_GOOGLE_QUI';
-const CLIENT_ID = 'INSERISCI_IL_TUO_CLIENT_ID_OAUTH_2.0_QUI';
-
-// -------------------------------------
+const API_KEY = process.env.GOOGLE_DRIVE_API_KEY;
+const CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID;
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const FOLDER_NAME = 'Report Sicurezza Jarvis';
