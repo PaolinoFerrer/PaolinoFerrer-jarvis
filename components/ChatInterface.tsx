@@ -21,7 +21,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
     setInputText(prev => (prev.trim() ? prev.trim() + ' ' : '') + transcript);
   };
 
-  const { isListening, isAvailable, toggleListening } = useVoiceRecognition(handleTranscript);
+  const { isListening, isAvailable, startListening, stopListening } = useVoiceRecognition(handleTranscript);
+
+  const handleToggleMic = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -112,15 +120,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             <PaperclipIcon className="w-6 h-6" />
           </label>
            {isAvailable && (
-             <div className="flex items-center gap-2">
+             <div className="flex items-center gap-2" title={isListening ? 'Spegni microfono' : 'Accendi microfono'}>
                 <MicrophoneIcon className={`w-6 h-6 transition-colors ${isListening ? 'text-green-500' : 'text-jarvis-text-secondary'}`} />
                 <button
                   type="button"
-                  onClick={toggleListening}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-jarvis-primary focus:ring-offset-2 focus:ring-offset-jarvis-bg ${isListening ? 'bg-green-500' : 'bg-red-600'}`}
+                  onClick={handleToggleMic}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-jarvis-primary focus:ring-offset-2 focus:ring-offset-jarvis-bg ${isListening ? 'bg-green-600' : 'bg-red-700'}`}
                   role="switch"
                   aria-checked={isListening}
-                  aria-label="Toggle Microphone"
                 >
                   <span
                     aria-hidden="true"
