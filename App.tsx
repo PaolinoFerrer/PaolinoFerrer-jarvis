@@ -41,9 +41,10 @@ const App: React.FC = () => {
     const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
     
 
-    // Initial greeting from Jarvis
+    // Initial greeting and knowledge base load
     useEffect(() => {
         startChat(); // Initialize the chat session
+        handleRefreshKnowledgeBase(); // Load knowledge base from storage
         setMessages([
             {
                 id: 'init',
@@ -75,46 +76,34 @@ const App: React.FC = () => {
         setMessages((prev) => [...prev, userMessage]);
 
         try {
-            // FIX: Pass the current knowledge base to the AI (simulated via API call here)
-            // In a real RAG system, this would happen on the backend.
-            // For now, we prepend it to the user's message as context.
             const knowledgeContext = knowledgeSources.length > 0
-                ? `Contesto dalla base di conoscenza:\n${knowledgeSources.map(s => `- ${s.title}: ${s.uri}`).join('\n')}\n\nUser:`
+                ? `## Contesto dalla Base di Conoscenza (da usare come fonte primaria):\n${knowledgeSources.map(s => `- ${s.title}: ${s.uri}`).join('\n')}\n\n## Richiesta Utente:\n`
                 : '';
             const messageWithContext = `${knowledgeContext}${text}`;
 
-
             const { conversationalResponse, report: newReport, sources } = await sendChatMessage(messageWithContext, imagePayload);
             
+            // Photo analysis attachment logic needs to be updated for the new structure
             if (imagePayload) {
-                // Heuristic to find the finding related to the photo and attach the photo data for display in the report
-                const allFindings = newReport.flatMap(s => s.findings);
-                const oldFindings = report.flatMap(s => s.findings);
-                const newFindings = allFindings.filter(f => !oldFindings.some(of => of.id === f.id) && f.photo?.analysis);
+                 // A simple heuristic: find the first new finding with photo analysis and attach the image
+                const allNewFindings = newReport.flatMap(w => w.tasks.flatMap(t => t.findings));
+                const allOldFindings = report.flatMap(w => w.tasks.flatMap(t => t.findings));
+                const newFindingWithPhoto = allNewFindings.find(f => 
+                    !allOldFindings.some(of => of.id === f.id) && f.photo?.analysis
+                );
 
-                if (newFindings.length > 0) {
-                    const targetFindingId = newFindings[0].id;
-                    for (const section of newReport) {
-                        const findingInReport = section.findings.find(f => f.id === targetFindingId);
-                        if (findingInReport && findingInReport.photo) {
-                            findingInReport.photo.base64 = imageDisplayUrl;
-                            break;
-                        }
-                    }
+                if (newFindingWithPhoto) {
+                    newFindingWithPhoto.photo.base64 = imageDisplayUrl;
                 }
             }
 
             setReport(newReport);
-
-            // Filter out sources that are already in our knowledge base from suggestions
-            const newSuggestedSources = sources?.filter(s => s.uri && !knowledgeSources.some(ks => ks.uri === s.uri));
 
             const modelMessage: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'model',
                 text: conversationalResponse,
                 sources: sources?.filter(s => s.uri),
-                suggestedSources: newSuggestedSources
             };
             
             setMessages((prev) => [...prev, modelMessage]);
@@ -214,7 +203,7 @@ const App: React.FC = () => {
             await driveService.deleteFile(fileId);
             alert("Report eliminato con successo.");
             if (currentFile?.id === fileId) {
-                handleNewReport(false); // Clear current report if it was deleted
+                handleNewReport(false);
             }
             await handleRefreshArchive();
         } catch (err) {
@@ -261,7 +250,6 @@ const App: React.FC = () => {
         }
     };
 
-
     const handleDeleteSource = async (sourceId: string) => {
         try {
             await jarvisApi.deleteSource(sourceId);
@@ -277,7 +265,7 @@ const App: React.FC = () => {
         const doNewReport = () => {
             setReport([]);
             setCurrentFile(null);
-            startChat(); // Restart chat for a new session
+            startChat(); 
             setMessages([
                 {
                     id: 'init-new',
@@ -295,7 +283,6 @@ const App: React.FC = () => {
             doNewReport();
         }
     };
-
 
     return (
         <div className="bg-jarvis-bg text-jarvis-text font-sans min-h-screen flex flex-col">
@@ -324,7 +311,6 @@ const App: React.FC = () => {
                     messages={messages}
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
-                    onAddSource={handleAddWebSource}
                 />
                 <ReportView report={report} onSave={handleSaveReport} isLoggedIn={isLoggedIn} />
             </main>

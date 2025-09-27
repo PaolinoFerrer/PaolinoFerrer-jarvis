@@ -1,3 +1,25 @@
+// This file is new or was previously empty.
+export interface DpiItem {
+  name: string;
+  notes?: string;
+}
+
+export interface Task {
+  id: string;
+  name: string;
+  findings: Finding[];
+  requiredDpi: DpiItem[];
+}
+
+export interface Workplace {
+  id: string;
+  name: string;
+  tasks: Task[];
+}
+
+export type Report = Workplace[];
+
+
 export interface Finding {
   id: string;
   description: string;
@@ -7,24 +29,16 @@ export interface Finding {
   recommendation: string;
   photo?: {
     analysis: string;
-    base64?: string; // For displaying the uploaded photo in the report
+    base64?: string; 
   };
 }
-
-export interface Section {
-  title: string;
-  findings: Finding[];
-}
-
-export type Report = Section[];
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   text: string;
-  photo?: string; // base64 URI for display in chat
+  photo?: string; 
   sources?: { uri: string; title: string }[];
-  suggestedSources?: { uri: string; title: string }[];
 }
 
 export interface DriveFile {

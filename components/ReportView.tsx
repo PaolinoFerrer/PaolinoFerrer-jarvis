@@ -1,6 +1,5 @@
 import React from 'react';
-import { Report } from '../types.ts';
-// FIX: Import SaveIcon from the central icons file
+import { Report, Workplace, Task } from '../types.ts';
 import { DownloadIcon, SaveIcon } from './icons.tsx';
 
 interface ReportViewProps {
@@ -19,25 +18,41 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
 
   const handleExport = () => {
     let content = `Documento di Valutazione del Rischio - ${new Date().toLocaleString('it-IT')}\n\n`;
-    report.forEach(section => {
+    report.forEach(workplace => {
       content += `========================================\n`;
-      content += `SEZIONE: ${section.title.toUpperCase()}\n`;
+      content += `LUOGO DI LAVORO: ${workplace.name.toUpperCase()}\n`;
       content += `========================================\n\n`;
-      if (!section.findings || section.findings.length === 0) {
-        content += `Nessun rilievo in questa sezione.\n\n`;
+      if (!workplace.tasks || workplace.tasks.length === 0) {
+        content += `Nessuna mansione specificata per questo luogo di lavoro.\n\n`;
       } else {
-        section.findings.forEach((finding, index) => {
-          content += `RILIEVO #${index + 1}\n`;
-          content += `----------------------------------------\n`;
-          content += `Descrizione: ${finding.description}\n`;
-          content += `Pericolo Identificato: ${finding.hazard}\n`;
-          content += `Livello di Rischio: ${finding.riskLevel}/10\n`;
-          content += `Normativa di Riferimento: ${finding.regulation}\n`;
-          content += `Azione Correttiva Raccomandata: ${finding.recommendation}\n`;
-          if (finding.photo && finding.photo.analysis) {
-            content += `Analisi Foto: ${finding.photo.analysis}\n`;
+        workplace.tasks.forEach((task) => {
+          content += `  ----------------------------------------\n`;
+          content += `  MANSIONE: ${task.name}\n`;
+          content += `  ----------------------------------------\n\n`;
+          
+          content += `  *** RILIEVI DI RISCHIO ***\n`;
+          if (!task.findings || task.findings.length === 0) {
+             content += `  - Nessun rilievo specifico per questa mansione.\n\n`;
+          } else {
+            task.findings.forEach((finding, findIndex) => {
+              content += `  Rilievo #${findIndex + 1}:\n`;
+              content += `    Descrizione: ${finding.description}\n`;
+              content += `    Pericolo: ${finding.hazard}\n`;
+              content += `    Rischio: ${finding.riskLevel}/10\n`;
+              content += `    Normativa: ${finding.regulation}\n`;
+              content += `    Raccomandazione: ${finding.recommendation}\n\n`;
+            });
           }
-          content += `\n`;
+
+          content += `  *** DISPOSITIVI DI PROTEZIONE INDIVIDUALE (DPI) ***\n`;
+           if (!task.requiredDpi || task.requiredDpi.length === 0) {
+             content += `  - Nessun DPI specifico per questa mansione.\n\n`;
+           } else {
+              task.requiredDpi.forEach(dpi => {
+                content += `  - ${dpi.name}${dpi.notes ? ` (${dpi.notes})` : ''}\n`;
+              });
+              content += `\n`;
+           }
         });
       }
     });
@@ -48,7 +63,6 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
     link.href = url;
     link.download = `report-sicurezza-jarvis-${Date.now()}.txt`;
     
-    // FIX: More robust download trigger for all browsers/devices
     document.body.appendChild(link);
     link.click();
     
@@ -58,7 +72,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
     }, 100);
   };
 
-  const isReportEmpty = report.length === 0 || report.every(s => !s.findings || s.findings.length === 0);
+  const isReportEmpty = report.length === 0 || report.every(w => !w.tasks || w.tasks.length === 0);
   const isSaveDisabled = isReportEmpty || !isLoggedIn;
 
   return (
@@ -86,36 +100,49 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
         </div>
       </div>
       <div className="space-y-8">
-        {report.length === 0 ? (
+        {isReportEmpty ? (
           <div className="text-center text-jarvis-text-secondary py-10">
             <p>Il report è vuoto.</p>
             <p>Inizia la conversazione per aggiungere rilievi.</p>
           </div>
         ) : (
-          report.map((section, sectionIndex) => (
-            <div key={sectionIndex}>
-              <h3 className="text-xl font-semibold border-b-2 border-jarvis-primary/30 pb-2 mb-4 text-jarvis-secondary">{section.title}</h3>
-              {(!section.findings || section.findings.length === 0) ? (
-                <p className="text-jarvis-text-secondary italic">Nessun rilievo per questa sezione.</p>
+          report.map((workplace) => (
+            <div key={workplace.id}>
+              <h3 className="text-xl font-semibold border-b-2 border-jarvis-primary/30 pb-2 mb-4 text-jarvis-secondary">
+                Luogo: {workplace.name}
+              </h3>
+              {(!workplace.tasks || workplace.tasks.length === 0) ? (
+                <p className="text-jarvis-text-secondary italic ml-2">Nessuna mansione specificata.</p>
               ) : (
-                <div className="space-y-4">
-                  {section.findings.map((finding) => (
-                    <div key={finding.id} className="bg-jarvis-bg/50 rounded-lg p-4 border border-jarvis-text/10">
-                      <div className={`font-bold mb-2 flex justify-between items-center border-b border-jarvis-text/10 pb-2`}>
-                          <p>{finding.hazard}</p>
-                          <span className={`px-3 py-1 text-sm rounded-full border ${getRiskColor(finding.riskLevel)}`}>
-                            Rischio: {finding.riskLevel}/10
-                          </span>
-                      </div>
-                      <p className="text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Descrizione:</strong> {finding.description}</p>
-                      <p className="text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Normativa:</strong> {finding.regulation}</p>
-                      <p className="text-jarvis-text-secondary mb-3"><strong className="text-jarvis-text">Raccomandazione:</strong> {finding.recommendation}</p>
-                      {finding.photo && (
-                         <div className="mt-4 border-t border-jarvis-text/10 pt-3">
-                           <p className="text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Analisi Foto:</strong> {finding.photo.analysis}</p>
-                           {finding.photo.base64 && <img src={finding.photo.base64} alt="Foto del rilievo" className="rounded-lg max-h-48 w-auto" />}
-                         </div>
-                      )}
+                <div className="space-y-6 pl-2">
+                  {workplace.tasks.map((task) => (
+                    <div key={task.id} className="bg-jarvis-bg/30 rounded-lg p-4 border border-jarvis-text/10">
+                        <h4 className="text-lg font-semibold text-jarvis-primary mb-3">{task.name}</h4>
+                        
+                        <div className="space-y-4">
+                          {task.findings.map((finding) => (
+                            <div key={finding.id} className="bg-jarvis-bg/50 rounded-lg p-3">
+                              <div className={`font-bold mb-2 flex justify-between items-center border-b border-jarvis-text/10 pb-2`}>
+                                  <p>{finding.hazard}</p>
+                                  <span className={`px-3 py-1 text-sm rounded-full border ${getRiskColor(finding.riskLevel)}`}>
+                                    Rischio: {finding.riskLevel}/10
+                                  </span>
+                              </div>
+                              <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Descrizione:</strong> {finding.description}</p>
+                              <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Normativa:</strong> {finding.regulation}</p>
+                              <p className="text-sm text-jarvis-text-secondary"><strong className="text-jarvis-text">Raccomandazione:</strong> {finding.recommendation}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {task.requiredDpi && task.requiredDpi.length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-jarvis-text/10">
+                                <h5 className="font-semibold text-jarvis-text-secondary mb-2">DPI Obbligatori:</h5>
+                                <ul className="list-disc list-inside text-sm text-jarvis-text-secondary space-y-1">
+                                    {task.requiredDpi.map((dpi, i) => <li key={i}>{dpi.name}</li>)}
+                                </ul>
+                            </div>
+                        )}
                     </div>
                   ))}
                 </div>

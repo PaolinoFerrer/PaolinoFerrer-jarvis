@@ -7,16 +7,12 @@ interface ChatInterfaceProps {
   messages: ChatMessage[];
   onSendMessage: (text: string, file?: File) => void;
   isLoading: boolean;
-  onAddSource: (source: { uri: string; title: string }) => void; // NUOVO: Callback per aggiungere una fonte
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, isLoading, onAddSource }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, isLoading }) => {
   const [inputText, setInputText] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  
-  // NUOVO: Stato per tenere traccia dei suggerimenti ignorati
-  const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -56,17 +52,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
       }
     }
   };
-  
-  const handleAddSource = (source: { uri: string; title: string }) => {
-    onAddSource(source);
-    // Aggiungiamo la fonte agli ignorati per nascondere il box dopo il click
-    setIgnoredSuggestions(prev => new Set(prev).add(source.uri));
-  };
-
-  const handleIgnoreSuggestion = (sourceUri: string) => {
-    setIgnoredSuggestions(prev => new Set(prev).add(sourceUri));
-  };
-
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -109,27 +94,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
                 )}
               </div>
             </div>
-            {/* NUOVO: Blocco per i suggerimenti di apprendimento */}
-            {msg.role === 'model' && msg.suggestedSources && msg.suggestedSources.map(source => 
-              !ignoredSuggestions.has(source.uri) && (
-                <div key={source.uri} className="mt-2 ml-11 max-w-md lg:max-w-xl p-3 rounded-2xl bg-jarvis-primary/10 border border-jarvis-primary/20">
-                    <p className="text-sm text-jarvis-secondary mb-2">
-                        <strong>Apprendimento:</strong> Vuole aggiungere questa fonte alla base di conoscenza di Jarvis per migliorare le risposte future?
-                    </p>
-                    <p className="text-xs text-jarvis-text mb-3 truncate">
-                        <a href={source.uri} target="_blank" rel="noopener noreferrer" className="hover:underline">{source.title || source.uri}</a>
-                    </p>
-                    <div className="flex gap-2">
-                        <button onClick={() => handleAddSource(source)} className="text-xs px-3 py-1 bg-jarvis-primary/80 text-white rounded-md hover:bg-jarvis-primary">
-                            Sì, aggiungi
-                        </button>
-                        <button onClick={() => handleIgnoreSuggestion(source.uri)} className="text-xs px-3 py-1 bg-jarvis-text/20 text-jarvis-text-secondary rounded-md hover:bg-jarvis-text/30">
-                            Ignora
-                        </button>
-                    </div>
-                </div>
-              )
-            )}
           </div>
         ))}
          {isLoading && (
