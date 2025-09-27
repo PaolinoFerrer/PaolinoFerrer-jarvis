@@ -119,7 +119,7 @@ const App: React.FC = () => {
           const oldSection = report.find(s => s.title === newSection.title);
           return {
               ...newSection,
-              findings: newSection.findings.map(newFinding => {
+              findings: (newSection.findings || []).map(newFinding => {
                   const oldFinding = oldSection?.findings.find(f => f.id === newFinding.id);
                   if (oldFinding?.photo?.base64 && newFinding.photo) {
                       return { ...newFinding, photo: { ...newFinding.photo, base64: oldFinding.photo.base64 }};
