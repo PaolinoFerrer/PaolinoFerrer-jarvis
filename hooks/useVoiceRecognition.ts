@@ -8,6 +8,13 @@ export const useVoiceRecognition = (onStop: (transcript: string) => void) => {
   const [isAvailable, setIsAvailable] = useState(false);
   const recognitionRef = useRef<any | null>(null);
   const transcriptRef = useRef<string>('');
+  
+  // Use a ref for the callback to prevent stale closures in event handlers
+  // and avoid re-running the main useEffect.
+  const onStopRef = useRef(onStop);
+  useEffect(() => {
+    onStopRef.current = onStop;
+  }, [onStop]);
 
   useEffect(() => {
     if (!SpeechRecognition) {
@@ -27,12 +34,10 @@ export const useVoiceRecognition = (onStop: (transcript: string) => void) => {
       setIsListening(true);
     };
 
+    // onend's only job is to update the UI state. It should not send data,
+    // as it can be triggered by silence on mobile browsers, which is not a user action.
     recognition.onend = () => {
       setIsListening(false);
-      // When recognition ends (manually or otherwise), call the onStop callback
-      if (transcriptRef.current) {
-        onStop(transcriptRef.current.trim());
-      }
     };
 
     recognition.onerror = (event: any) => {
@@ -41,6 +46,7 @@ export const useVoiceRecognition = (onStop: (transcript: string) => void) => {
     };
 
     recognition.onresult = (event: any) => {
+      // Accumulate the final transcript parts.
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           transcriptRef.current += event.results[i][0].transcript.trim() + ' ';
@@ -55,7 +61,7 @@ export const useVoiceRecognition = (onStop: (transcript: string) => void) => {
         recognitionRef.current.abort();
       }
     };
-  }, [onStop]);
+  }, []); // This effect should run only once.
 
   const startListening = useCallback(() => {
     if (isAvailable && recognitionRef.current && !isListening) {
@@ -70,6 +76,12 @@ export const useVoiceRecognition = (onStop: (transcript: string) => void) => {
   const stopListening = useCallback(() => {
     if (isAvailable && recognitionRef.current && isListening) {
       try {
+        // IMPORTANT: The message is sent ONLY when the user manually stops.
+        // We call the onStop callback with the accumulated transcript *before* stopping the engine.
+        if (transcriptRef.current.trim()) {
+          onStopRef.current(transcriptRef.current.trim());
+        }
+        // Now, we stop the recognition engine. This will trigger the 'onend' event.
         recognitionRef.current.stop();
       } catch (e) {
         console.error("Could not stop recognition:", e);
