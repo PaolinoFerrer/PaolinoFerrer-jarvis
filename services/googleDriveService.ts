@@ -107,17 +107,17 @@ function gisLoaded() {
  * Esegue il login dell'utente e ottiene il token di accesso.
  */
 export async function signIn(): Promise<void> {
-    await readyPromise; // Wait for initialization to complete
-    
-    return new Promise((resolve, reject) => {
-        if (!tokenClient) {
-            return reject(new Error('Il client di autenticazione Google non è pronto.'));
-        }
+    await readyPromise;
+    if (!tokenClient) {
+        throw new Error('Il client di autenticazione Google non è pronto.');
+    }
 
+    return new Promise((resolve, reject) => {
         const callback = (resp: google.accounts.oauth2.TokenResponse) => {
             if (resp.error) {
                 console.error('Google Sign-In Error:', resp);
-                return reject(new Error(`Errore durante l'accesso: ${resp.error}`));
+                const errorMessage = `Accesso fallito. Dettagli: ${resp.error_description || resp.error}`;
+                return reject(new Error(errorMessage));
             }
             gapi.client.setToken({ access_token: resp.access_token });
             resolve();
@@ -125,13 +125,11 @@ export async function signIn(): Promise<void> {
         
         tokenClient.callback = callback;
 
-        if (gapi.client.getToken() === null) {
-            tokenClient.requestAccessToken({ prompt: 'consent' });
-        } else {
-            tokenClient.requestAccessToken({ prompt: '' });
-        }
+        // Lascia che GIS gestisca il prompt (consenso, accesso silenzioso, ecc.)
+        tokenClient.requestAccessToken({ prompt: '' });
     });
 }
+
 
 /**
  * Esegue il logout dell'utente.

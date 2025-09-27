@@ -126,9 +126,9 @@ const App: React.FC = () => {
             await driveService.signIn();
             setIsLoggedIn(true);
             await handleRefreshArchive();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Login failed', err);
-            setError("Accesso a Google Drive fallito.");
+            setError(err.message || "Accesso a Google Drive fallito. Controlla la console per i dettagli.");
         }
     };
     
@@ -316,8 +316,9 @@ const App: React.FC = () => {
             </main>
 
             {error && (
-                <div className="fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50">
-                    <p>{error}</p>
+                <div className="fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm">
+                    <p className="font-semibold">Si è verificato un errore</p>
+                    <p className="text-sm">{error}</p>
                     <button onClick={() => setError(null)} className="absolute top-1 right-2 text-white font-bold">&times;</button>
                 </div>
             )}
