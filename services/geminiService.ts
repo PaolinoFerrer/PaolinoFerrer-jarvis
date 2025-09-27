@@ -118,19 +118,25 @@ export async function sendChatMessage(
         startChat();
     }
     
-    const parts: Part[] = [];
-    if (image) {
-        parts.push({
-            inlineData: {
-                mimeType: image.mimeType,
-                data: image.data,
-            },
-        });
-    }
-    parts.push({ text: message });
+    let messagePayload: string | Part[];
 
-    // FIX: The sendMessage method expects an object with a 'message' property containing the parts array.
-    const response: GenerateContentResponse = await chat.sendMessage({ message: parts });
+    if (image) {
+        // If there's an image, create a multi-part message
+        messagePayload = [
+            {
+                inlineData: {
+                    mimeType: image.mimeType,
+                    data: image.data,
+                },
+            },
+            { text: message }
+        ];
+    } else {
+        // If it's just text, send the raw string
+        messagePayload = message;
+    }
+
+    const response: GenerateContentResponse = await chat.sendMessage({ message: messagePayload });
     
     try {
         const rawText = response.text.trim();
