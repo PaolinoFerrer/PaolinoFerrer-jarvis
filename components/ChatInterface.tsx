@@ -7,12 +7,16 @@ interface ChatInterfaceProps {
   messages: ChatMessage[];
   onSendMessage: (text: string, file?: File) => void;
   isLoading: boolean;
+  onAddSource: (source: { uri: string; title: string }) => void; // NUOVO: Callback per aggiungere una fonte
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, isLoading }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, isLoading, onAddSource }) => {
   const [inputText, setInputText] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  
+  // NUOVO: Stato per tenere traccia dei suggerimenti ignorati
+  const [ignoredSuggestions, setIgnoredSuggestions] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -52,6 +56,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
       }
     }
   };
+  
+  const handleAddSource = (source: { uri: string; title: string }) => {
+    onAddSource(source);
+    // Aggiungiamo la fonte agli ignorati per nascondere il box dopo il click
+    setIgnoredSuggestions(prev => new Set(prev).add(source.uri));
+  };
+
+  const handleIgnoreSuggestion = (sourceUri: string) => {
+    setIgnoredSuggestions(prev => new Set(prev).add(sourceUri));
+  };
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -72,26 +87,49 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
     <div className="bg-jarvis-surface rounded-lg flex flex-col h-full overflow-hidden">
       <div className="flex-1 p-6 space-y-4 overflow-y-auto">
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex items-end gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {msg.role === 'model' && <BrainCircuitIcon className="w-8 h-8 text-jarvis-primary flex-shrink-0" />}
-            <div className={`max-w-md lg:max-w-xl p-4 rounded-2xl ${msg.role === 'user' ? 'bg-jarvis-primary/80 text-white rounded-br-none' : 'bg-jarvis-bg text-jarvis-text rounded-bl-none'}`}>
-              <p className="whitespace-pre-wrap">{msg.text}</p>
-              {msg.photo && <img src={msg.photo} alt="Allegato" className="mt-2 rounded-lg max-h-48 w-auto" />}
-              {msg.sources && msg.sources.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-jarvis-text/10">
-                  <h4 className="text-xs font-bold text-jarvis-text-secondary mb-1">Fonti:</h4>
-                  <ul className="text-xs space-y-1">
-                    {msg.sources.map((source, index) => (
-                      <li key={index}>
-                        <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-jarvis-secondary hover:underline truncate block">
-                          {source.title || source.uri}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+          <div key={msg.id}>
+            <div className={`flex items-end gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {msg.role === 'model' && <BrainCircuitIcon className="w-8 h-8 text-jarvis-primary flex-shrink-0" />}
+              <div className={`max-w-md lg:max-w-xl p-4 rounded-2xl ${msg.role === 'user' ? 'bg-jarvis-primary/80 text-white rounded-br-none' : 'bg-jarvis-bg text-jarvis-text rounded-bl-none'}`}>
+                <p className="whitespace-pre-wrap">{msg.text}</p>
+                {msg.photo && <img src={msg.photo} alt="Allegato" className="mt-2 rounded-lg max-h-48 w-auto" />}
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-jarvis-text/10">
+                    <h4 className="text-xs font-bold text-jarvis-text-secondary mb-1">Fonti:</h4>
+                    <ul className="text-xs space-y-1">
+                      {msg.sources.map((source, index) => (
+                        <li key={index}>
+                          <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-jarvis-secondary hover:underline truncate block">
+                            {source.title || source.uri}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
+            {/* NUOVO: Blocco per i suggerimenti di apprendimento */}
+            {msg.role === 'model' && msg.suggestedSources && msg.suggestedSources.map(source => 
+              !ignoredSuggestions.has(source.uri) && (
+                <div key={source.uri} className="mt-2 ml-11 max-w-md lg:max-w-xl p-3 rounded-2xl bg-jarvis-primary/10 border border-jarvis-primary/20">
+                    <p className="text-sm text-jarvis-secondary mb-2">
+                        <strong>Apprendimento:</strong> Vuole aggiungere questa fonte alla base di conoscenza di Jarvis per migliorare le risposte future?
+                    </p>
+                    <p className="text-xs text-jarvis-text mb-3 truncate">
+                        <a href={source.uri} target="_blank" rel="noopener noreferrer" className="hover:underline">{source.title || source.uri}</a>
+                    </p>
+                    <div className="flex gap-2">
+                        <button onClick={() => handleAddSource(source)} className="text-xs px-3 py-1 bg-jarvis-primary/80 text-white rounded-md hover:bg-jarvis-primary">
+                            Sì, aggiungi
+                        </button>
+                        <button onClick={() => handleIgnoreSuggestion(source.uri)} className="text-xs px-3 py-1 bg-jarvis-text/20 text-jarvis-text-secondary rounded-md hover:bg-jarvis-text/30">
+                            Ignora
+                        </button>
+                    </div>
+                </div>
+              )
+            )}
           </div>
         ))}
          {isLoading && (

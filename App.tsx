@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import ChatInterface from './components/ChatInterface.tsx';
 import ReportView from './components/ReportView.tsx';
@@ -6,7 +5,7 @@ import ArchiveModal from './components/ArchiveModal.tsx';
 import KnowledgeBaseModal from './components/KnowledgeBaseModal.tsx';
 import { ChatMessage, Report, DriveFile, ReportMetadata } from './types.ts';
 import { startChat } from './services/geminiService.ts';
-import { askJarvis } from './services/jarvisApi.ts';
+import { askJarvis, addSourceToKnowledgeBase } from './services/jarvisApi.ts';
 import * as driveService from './services/googleDriveService.ts';
 import { BrainCircuitIcon, ArchiveIcon, PlusIcon, GoogleIcon, LogoutIcon, DatabaseIcon } from './components/icons.tsx';
 
@@ -111,13 +110,14 @@ const App: React.FC = () => {
 
     try {
       // MODIFICA CHIAVE: Chiamiamo il nuovo servizio API invece di Gemini direttamente
-      const { conversationalResponse, report: newReportData, sources } = await askJarvis(fullMessage, imagePayload);
+      const { conversationalResponse, report: newReportData, sources, suggestedSources } = await askJarvis(fullMessage, imagePayload);
       
       const botMessage: ChatMessage = {
         id: Date.now().toString() + '-bot',
         role: 'model',
         text: conversationalResponse,
         sources: sources,
+        suggestedSources: suggestedSources, // Passiamo i suggerimenti al messaggio
       };
 
       setMessages(prev => [...prev, botMessage]);
@@ -158,6 +158,16 @@ const App: React.FC = () => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // NUOVO: Handler per aggiungere una fonte alla KB
+  const handleAddSource = async (source: { uri: string; title: string }) => {
+    try {
+        await addSourceToKnowledgeBase(source);
+    } catch(e) {
+        const err = e as Error;
+        setError(err.message);
     }
   };
 
@@ -298,7 +308,7 @@ const App: React.FC = () => {
           </div>
         )}
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden pt-4">
-          <ChatInterface messages={messages} onSendMessage={handleSendMessage} isLoading={isLoading} />
+          <ChatInterface messages={messages} onSendMessage={handleSendMessage} isLoading={isLoading} onAddSource={handleAddSource} />
           <ReportView report={report} onSave={handleSaveReport} isLoggedIn={isSignedIn} />
         </main>
       </div>

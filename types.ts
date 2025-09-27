@@ -33,7 +33,8 @@ export interface ChatMessage {
   role: 'user' | 'model' | 'system';
   text: string;
   photo?: string; // data URL for image
-  sources?: { uri: string; title: string }[]; // NEW: For Google Search grounding results
+  sources?: { uri: string; title: string }[];
+  suggestedSources?: { uri: string; title: string }[]; // NUOVO: Per la Fase 2 (apprendimento)
 }
 
 export interface DriveFile {

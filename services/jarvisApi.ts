@@ -1,4 +1,3 @@
-
 import { sendChatMessage } from './geminiService.ts';
 import { Report } from '../types.ts';
 
@@ -14,18 +13,26 @@ export async function askJarvis(
     conversationalResponse: string; 
     report: Report;
     sources?: { uri: string; title: string }[];
-    suggestedSources?: { uri: string; title: string }[]; // Per la Fase 2
+    suggestedSources?: { uri: string; title: string }[];
 }> {
     console.log("Chiamata a jarvisApi.askJarvis. In futuro, questo contatterà il backend RAG.");
     
-    // Simuliamo la chiamata al backend che, per ora, chiama semplicemente Gemini.
     const geminiResponse = await sendChatMessage(message, image);
     
-    // In futuro, il backend restituirà anche le fonti suggerite.
-    // Per ora, restituiamo un array vuoto per mantenere la coerenza del tipo di dati.
+    // FASE 2: Simulazione dell'identificazione di nuove fonti da parte del backend.
+    // Se la risposta di Gemini contiene fonti web, ne prendiamo una a caso e la
+    // proponiamo come "suggerimento" da aggiungere alla base di conoscenza.
+    const suggestedSources: { uri: string; title: string }[] = [];
+    if (geminiResponse.sources && geminiResponse.sources.length > 0) {
+        // In un sistema reale, qui confronteremmo le fonti con quelle già nel DB.
+        // Per la simulazione, ne suggeriamo una a caso.
+        const randomSource = geminiResponse.sources[Math.floor(Math.random() * geminiResponse.sources.length)];
+        suggestedSources.push(randomSource);
+    }
+
     return {
         ...geminiResponse,
-        suggestedSources: [] 
+        suggestedSources: suggestedSources, 
     };
 }
 
@@ -55,4 +62,28 @@ export async function uploadKnowledgeDocuments(files: FileList): Promise<void> {
    
    // Per ora, mostriamo solo un avviso di successo per simulare l'operazione.
    alert(`(Simulazione) ${files.length} file(s) sono stati inviati al backend per l'elaborazione. Saranno disponibili per Jarvis a breve.`);
+}
+
+
+/**
+ * Simula l'aggiunta di una fonte approvata dall'utente alla base di conoscenza.
+ * @param source La fonte da aggiungere.
+ */
+export async function addSourceToKnowledgeBase(source: { uri: string; title: string }): Promise<void> {
+    console.log("Aggiunta della fonte alla base di conoscenza:", source);
+    
+    // In un sistema reale, qui faremmo una chiamata POST al backend con l'URI della fonte.
+    // Il backend si occuperebbe di scaricare, processare e indicizzare il contenuto.
+    /* Esempio futuro:
+    const response = await fetch('https://IL-TUO-BACKEND-JARVIS.run.app/api/knowledge/add-source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uri: source.uri, title: source.title })
+    });
+    if (!response.ok) {
+        throw new Error("Errore durante l'aggiunta della fonte.");
+    }
+    */
+   
+   alert(`(Simulazione) La fonte "${source.title}" è stata aggiunta alla base di conoscenza di Jarvis.`);
 }
