@@ -36,6 +36,7 @@ const App: React.FC = () => {
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   
   useEffect(() => {
@@ -49,6 +50,8 @@ const App: React.FC = () => {
   }, []);
 
   const handleSignIn = async () => {
+    setIsSigningIn(true);
+    setError(null);
     try {
       await driveService.signIn();
       setIsSignedIn(true);
@@ -60,6 +63,8 @@ const App: React.FC = () => {
     } catch (e) {
       setError('Accesso a Google Drive fallito.');
       console.error(e);
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
@@ -264,9 +269,13 @@ const App: React.FC = () => {
                     </button>
                 </>
             ) : (
-                <button onClick={handleSignIn} className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
+                <button 
+                  onClick={handleSignIn} 
+                  disabled={isSigningIn}
+                  className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-70 disabled:cursor-wait"
+                >
                     <GoogleIcon className="w-5 h-5"/>
-                    <span className="font-medium">Accedi con Google</span>
+                    <span className="font-medium">{isSigningIn ? 'Accesso in corso...' : 'Accedi con Google'}</span>
                 </button>
             )}
           </div>
