@@ -1,13 +1,7 @@
 import React from 'react';
 import { Report } from '../types.ts';
-import { DownloadIcon } from './icons.tsx';
-
-const SaveIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
-    </svg>
-);
-
+// FIX: Import SaveIcon from the central icons file
+import { DownloadIcon, SaveIcon } from './icons.tsx';
 
 interface ReportViewProps {
   report: Report;
@@ -119,7 +113,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
                       {finding.photo && (
                          <div className="mt-4 border-t border-jarvis-text/10 pt-3">
                            <p className="text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Analisi Foto:</strong> {finding.photo.analysis}</p>
-                           <img src={finding.photo.base64} alt="Foto del rilievo" className="rounded-lg max-h-48 w-auto" />
+                           {finding.photo.base64 && <img src={finding.photo.base64} alt="Foto del rilievo" className="rounded-lg max-h-48 w-auto" />}
                          </div>
                       )}
                     </div>

@@ -1,89 +1,64 @@
-import { sendChatMessage } from './geminiService.ts';
-import { Report } from '../types.ts';
+import { KnowledgeSource } from '../types.ts';
 
-/**
- * In un'applicazione reale, questa sarebbe una chiamata HTTP al nostro backend.
- * Per ora, è un wrapper attorno al servizio Gemini per simulare il cambiamento architetturale.
- * Questo è il punto di ingresso per tutte le interazioni con l'AI da ora in poi.
- */
-export async function askJarvis(
-    message: string,
-    image?: { mimeType: string; data: string }
-): Promise<{ 
-    conversationalResponse: string; 
-    report: Report;
-    sources?: { uri: string; title: string }[];
-    suggestedSources?: { uri: string; title: string }[];
-}> {
-    console.log("Chiamata a jarvisApi.askJarvis. In futuro, questo contatterà il backend RAG.");
-    
-    const geminiResponse = await sendChatMessage(message, image);
-    
-    // FASE 2: Simulazione dell'identificazione di nuove fonti da parte del backend.
-    // Se la risposta di Gemini contiene fonti web, ne prendiamo una a caso e la
-    // proponiamo come "suggerimento" da aggiungere alla base di conoscenza.
-    const suggestedSources: { uri: string; title: string }[] = [];
-    if (geminiResponse.sources && geminiResponse.sources.length > 0) {
-        // In un sistema reale, qui confronteremmo le fonti con quelle già nel DB.
-        // Per la simulazione, ne suggeriamo una a caso.
-        const randomSource = geminiResponse.sources[Math.floor(Math.random() * geminiResponse.sources.length)];
-        suggestedSources.push(randomSource);
+// This is a mock API. In a real application, this would make fetch requests
+// to a backend server (e.g., 'https://api.jarvis-app.com/sources').
+
+const API_ENDPOINT = '/api/knowledge'; // Using a local proxy for development
+
+let mockKnowledgeBase: KnowledgeSource[] = [
+    {
+        id: '1',
+        type: 'web',
+        uri: 'https://www.gazzettaufficiale.it/eli/id/2008/04/30/008G0104/sg',
+        title: 'D.Lgs. 81/08 - Testo Unico Sicurezza Lavoro',
+        status: 'ready',
+        createdAt: new Date().toISOString()
     }
+];
 
-    return {
-        ...geminiResponse,
-        suggestedSources: suggestedSources, 
+export const listSources = async (): Promise<KnowledgeSource[]> => {
+    console.log('API: Listing sources');
+    // In a real app:
+    // const response = await fetch(API_ENDPOINT);
+    // if (!response.ok) throw new Error('Failed to fetch sources');
+    // return response.json();
+    return Promise.resolve([...mockKnowledgeBase]);
+};
+
+export const addSource = async (uri: string, title: string): Promise<KnowledgeSource> => {
+    console.log('API: Adding source', { uri, title });
+    // In a real app:
+    // const response = await fetch(API_ENDPOINT, {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ uri, title, type: 'web' })
+    // });
+    // if (!response.ok) throw new Error('Failed to add source');
+    // return response.json();
+
+    const newSource: KnowledgeSource = {
+        id: Date.now().toString(),
+        type: 'web',
+        uri,
+        title,
+        status: 'ready', // Mocking as instantly ready
+        createdAt: new Date().toISOString()
     };
-}
+    mockKnowledgeBase.push(newSource);
+    return Promise.resolve(newSource);
+};
 
-/**
- * In futuro, questa funzione caricherà i file sul backend per l'elaborazione
- * e l'inserimento nel database vettoriale.
- * @param files L'elenco dei file selezionati dall'utente.
- */
-export async function uploadKnowledgeDocuments(files: FileList): Promise<void> {
-    console.log("Invio dei file al backend della base di conoscenza:", files);
+export const deleteSource = async (sourceId: string): Promise<void> => {
+    console.log('API: Deleting source', sourceId);
+    // In a real app:
+    // const response = await fetch(`${API_ENDPOINT}/${sourceId}`, { method: 'DELETE' });
+    // if (!response.ok) throw new Error('Failed to delete source');
     
-    // Qui, in una vera applicazione, useremmo fetch() per inviare i file al server
-    // con una richiesta POST di tipo multipart/form-data.
-    /* Esempio futuro:
-    const formData = new FormData();
-    for (const file of files) {
-        formData.append('documents', file);
+    const index = mockKnowledgeBase.findIndex(s => s.id === sourceId);
+    if (index > -1) {
+        mockKnowledgeBase.splice(index, 1);
+    } else {
+        throw new Error("Source not found");
     }
-    const response = await fetch('https://IL-TUO-BACKEND-JARVIS.run.app/api/knowledge', {
-        method: 'POST',
-        body: formData
-    });
-    if (!response.ok) {
-        throw new Error("Errore durante il caricamento dei documenti.");
-    }
-    */
-   
-   // Per ora, mostriamo solo un avviso di successo per simulare l'operazione.
-   alert(`(Simulazione) ${files.length} file(s) sono stati inviati al backend per l'elaborazione. Saranno disponibili per Jarvis a breve.`);
-}
-
-
-/**
- * Simula l'aggiunta di una fonte approvata dall'utente alla base di conoscenza.
- * @param source La fonte da aggiungere.
- */
-export async function addSourceToKnowledgeBase(source: { uri: string; title: string }): Promise<void> {
-    console.log("Aggiunta della fonte alla base di conoscenza:", source);
-    
-    // In un sistema reale, qui faremmo una chiamata POST al backend con l'URI della fonte.
-    // Il backend si occuperebbe di scaricare, processare e indicizzare il contenuto.
-    /* Esempio futuro:
-    const response = await fetch('https://IL-TUO-BACKEND-JARVIS.run.app/api/knowledge/add-source', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uri: source.uri, title: source.title })
-    });
-    if (!response.ok) {
-        throw new Error("Errore durante l'aggiunta della fonte.");
-    }
-    */
-   
-   alert(`(Simulazione) La fonte "${source.title}" è stata aggiunta alla base di conoscenza di Jarvis.`);
-}
+    return Promise.resolve();
+};

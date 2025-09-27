@@ -1,331 +1,335 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ChatInterface from './components/ChatInterface.tsx';
 import ReportView from './components/ReportView.tsx';
 import ArchiveModal from './components/ArchiveModal.tsx';
 import KnowledgeBaseModal from './components/KnowledgeBaseModal.tsx';
-import { ChatMessage, Report, DriveFile, ReportMetadata } from './types.ts';
-import { startChat } from './services/geminiService.ts';
-import { askJarvis, addSourceToKnowledgeBase } from './services/jarvisApi.ts';
+import { ChatMessage, Report, DriveFile, KnowledgeSource } from './types.ts';
+import { sendChatMessage, startChat } from './services/geminiService.ts';
 import * as driveService from './services/googleDriveService.ts';
-import { BrainCircuitIcon, ArchiveIcon, PlusIcon, GoogleIcon, LogoutIcon, DatabaseIcon } from './components/icons.tsx';
+import * as jarvisApi from './services/jarvisApi.ts';
+import { BrainCircuitIcon } from './components/icons.tsx';
 
-const fileToBase64 = (file: File): Promise<{mimeType: string, data: string}> => {
+// Helper function to convert File to base64
+const fileToBase64 = (file: File): Promise<{ mimeType: string; data: string }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
       const result = reader.result as string;
-      const [header, data] = result.split(',');
-      const mimeType = header.match(/:(.*?);/)?.[1] || file.type;
+      const mimeType = result.split(';')[0].split(':')[1];
+      const data = result.split(',')[1];
       resolve({ mimeType, data });
     };
-    reader.onerror = error => reject(error);
+    reader.onerror = (error) => reject(error);
   });
 };
 
-const getInitialMessages = (): ChatMessage[] => [{
-  id: 'init',
-  role: 'system',
-  text: 'Buongiorno. Sono Jarvis. Per iniziare, acceda con il suo account Google per poter salvare e caricare i sopralluoghi.'
-}];
-
 const App: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>(getInitialMessages());
-  const [report, setReport] = useState<Report>([]);
-  const [reportMetadata, setReportMetadata] = useState<ReportMetadata>({ driveId: null, name: null });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Modal states
-  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-  const [isKnowledgeModalOpen, setIsKnowledgeModalOpen] = useState(false);
-  
-  const [isSignedIn, setIsSignedIn] = useState(false);
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
-  
-  useEffect(() => {
-    try {
-      // Initialize AI chat on component mount
-      startChat();
-    } catch (e) {
-      const err = e as Error;
-      setError(`Errore critico nell'inizializzazione dell'AI: ${err.message}`);
-    }
-  }, []);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [report, setReport] = useState<Report>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-  const handleSignIn = async () => {
-    setIsSigningIn(true);
-    setError(null);
-    try {
-      await driveService.signIn();
-      setIsSignedIn(true);
-      setMessages([{
-        id: 'init-signed-in',
-        role: 'system',
-        text: 'Accesso eseguito. Ora può iniziare un nuovo sopralluogo, caricarne uno dall\'archivio, o arricchire la mia base di conoscenza.'
-      }]);
-    } catch (e) {
-      setError('Accesso a Google Drive fallito.');
-      console.error(e);
-    } finally {
-      setIsSigningIn(false);
-    }
-  };
+    // Google Drive State
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [currentFile, setCurrentFile] = useState<DriveFile | null>(null);
 
-  const handleSignOut = () => {
-    driveService.signOut();
-    setIsSignedIn(false);
-    setReport([]);
-    setReportMetadata({ driveId: null, name: null });
-    setMessages(getInitialMessages());
-  };
+    // Knowledge Base State
+    const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
+    const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
+    
 
+    // Initial greeting from Jarvis
+    useEffect(() => {
+        startChat(); // Initialize the chat session
+        setMessages([
+            {
+                id: 'init',
+                role: 'model',
+                text: 'Buongiorno, sono Jarvis. Come posso assisterla con la sua valutazione dei rischi oggi?',
+            },
+        ]);
+    }, []);
 
-  const handleSendMessage = async (text: string, file?: File, context?: string) => {
-    setIsLoading(true);
-    setError(null);
+    const handleSendMessage = useCallback(async (text: string, file?: File) => {
+        setIsLoading(true);
+        setError(null);
 
-    const fullMessage = context ? `${context}\n\n${text}` : text;
+        const userMessage: ChatMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            text: text,
+        };
+        
+        let imagePayload;
+        let imageDisplayUrl: string | undefined;
+        if (file) {
+            const { mimeType, data } = await fileToBase64(file);
+            imagePayload = { mimeType, data };
+            imageDisplayUrl = `data:${mimeType};base64,${data}`;
+            userMessage.photo = imageDisplayUrl;
+        }
 
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      text,
+        setMessages((prev) => [...prev, userMessage]);
+
+        try {
+            const { conversationalResponse, report: newReport, sources } = await sendChatMessage(text, imagePayload);
+            
+            if (imagePayload) {
+                // Heuristic to find the finding related to the photo and attach the photo data for display in the report
+                const allFindings = newReport.flatMap(s => s.findings);
+                const oldFindings = report.flatMap(s => s.findings);
+                const newFindings = allFindings.filter(f => !oldFindings.some(of => of.id === f.id) && f.photo?.analysis);
+
+                if (newFindings.length > 0) {
+                    const targetFindingId = newFindings[0].id;
+                    for (const section of newReport) {
+                        const findingInReport = section.findings.find(f => f.id === targetFindingId);
+                        if (findingInReport && findingInReport.photo) {
+                            findingInReport.photo.base64 = imageDisplayUrl;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            setReport(newReport);
+
+            const modelMessage: ChatMessage = {
+                id: (Date.now() + 1).toString(),
+                role: 'model',
+                text: conversationalResponse,
+                sources: sources?.filter(s => s.uri),
+                suggestedSources: sources?.filter(s => s.uri)
+            };
+            
+            setMessages((prev) => [...prev, modelMessage]);
+
+        } catch (err: any) {
+            const errorMessage = `Errore: ${err.message || 'Si è verificato un problema.'}`;
+            setError(errorMessage);
+            setMessages((prev) => [
+                ...prev,
+                { id: 'error', role: 'model', text: errorMessage },
+            ]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [report]);
+
+    // Google Drive Handlers
+    const handleLogin = async () => {
+        try {
+            await driveService.signIn();
+            setIsLoggedIn(true);
+            await handleRefreshArchive();
+        } catch (err) {
+            console.error('Login failed', err);
+            setError("Accesso a Google Drive fallito.");
+        }
     };
     
-    let imagePayload;
-    if (file) {
-      try {
-        imagePayload = await fileToBase64(file);
-        userMessage.photo = `data:${imagePayload.mimeType};base64,${imagePayload.data}`;
-      } catch (err) {
-        setError("Impossibile caricare l'immagine.");
-        setIsLoading(false);
-        return;
-      }
-    }
-    
-    setMessages(prev => [...prev, userMessage]);
+    const handleLogout = async () => {
+        await driveService.signOut();
+        setIsLoggedIn(false);
+        setCurrentFile(null);
+    };
 
-    try {
-      // MODIFICA CHIAVE: Chiamiamo il nuovo servizio API invece di Gemini direttamente
-      const { conversationalResponse, report: newReportData, sources, suggestedSources } = await askJarvis(fullMessage, imagePayload);
-      
-      const botMessage: ChatMessage = {
-        id: Date.now().toString() + '-bot',
-        role: 'model',
-        text: conversationalResponse,
-        sources: sources,
-        suggestedSources: suggestedSources, // Passiamo i suggerimenti al messaggio
-      };
-
-      setMessages(prev => [...prev, botMessage]);
-
-      const processedReport = newReportData.map(newSection => {
-          const oldSection = report.find(s => s.title === newSection.title);
-          return {
-              ...newSection,
-              findings: (newSection.findings || []).map(newFinding => {
-                  const oldFinding = oldSection?.findings.find(f => f.id === newFinding.id);
-                  if (oldFinding?.photo?.base64 && newFinding.photo) {
-                      return { ...newFinding, photo: { ...newFinding.photo, base64: oldFinding.photo.base64 }};
-                  }
-                  return newFinding;
-              })
-          };
-      });
-
-      if (userMessage.photo) {
-          let photoAttached = false;
-          for (let i = processedReport.length - 1; i >= 0 && !photoAttached; i--) {
-              const section = processedReport[i];
-              for (let j = section.findings.length - 1; j >= 0 && !photoAttached; j--) {
-                  const finding = section.findings[j];
-                  if (finding.photo && finding.photo.analysis && !finding.photo.base64) {
-                      finding.photo.base64 = userMessage.photo;
-                      photoAttached = true;
-                  }
-              }
-          }
-      }
-      setReport(processedReport);
-
-    } catch (e) {
-      const err = e as Error;
-      setError(err.message);
-      const errorMessage: ChatMessage = { id: Date.now().toString() + '-err', role: 'system', text: `Si è verificato un errore: ${err.message}` };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // NUOVO: Handler per aggiungere una fonte alla KB
-  const handleAddSource = async (source: { uri: string; title: string }) => {
-    try {
-        await addSourceToKnowledgeBase(source);
-    } catch(e) {
-        const err = e as Error;
-        setError(err.message);
-    }
-  };
-
-  const handleSaveReport = async () => {
-    const isEditing = !!reportMetadata.driveId;
-    let fileName = reportMetadata.name;
-
-    if (!isEditing) {
-        fileName = prompt("Inserisci un nome per questo sopralluogo:");
-    } else {
-        const action = confirm(`Stai modificando "${fileName}".\n\n- Clicca OK per salvare le modifiche (sovrascrivere).\n- Clicca Annulla per salvarlo come una nuova copia.`);
-        if (!action) {
-            fileName = prompt("Inserisci un nuovo nome per la copia:", `${fileName} (copia)`);
+    const handleSaveReport = async () => {
+        let fileName = currentFile?.name || `Report ${new Date().toLocaleDateString('it-IT')}`;
+        if (!currentFile) {
+            const newName = prompt("Inserisci il nome del file per il report:", fileName);
+            if (newName === null || !newName.trim()) return;
+            fileName = newName;
         }
-    }
+        
+        try {
+            const savedFile = await driveService.saveFile(report, fileName, currentFile?.id || null);
+            setCurrentFile(savedFile);
+            alert(`Report salvato come "${savedFile.name}"`);
+            await handleRefreshArchive();
+        } catch(err) {
+            console.error('Save failed', err);
+            setError("Salvataggio su Google Drive fallito.");
+        }
+    };
 
-    if (!fileName) return;
+    const handleOpenArchive = async () => {
+        if (!isLoggedIn) {
+            alert("Effettua l'accesso con Google per visualizzare l'archivio.");
+            return;
+        }
+        await handleRefreshArchive();
+        setIsArchiveOpen(true);
+    };
 
-    setIsLoading(true);
-    try {
-        const fileIdToSave = isEditing && fileName === reportMetadata.name ? reportMetadata.driveId : null;
-        const savedFile = await driveService.saveFile(report, fileName, fileIdToSave);
-        setReportMetadata({ driveId: savedFile.id, name: savedFile.name.replace('.jarvis.report.json', '') });
-        alert(`Report "${fileName}" salvato con successo su Google Drive!`);
-    } catch (e) {
-        setError('Errore durante il salvataggio su Google Drive.');
-    } finally {
-        setIsLoading(false);
-    }
-  };
+    const handleRefreshArchive = async () => {
+        try {
+            const files = await driveService.listFiles();
+            setDriveFiles(files);
+        } catch(err) {
+            console.error('Failed to list files', err);
+            setError("Impossibile caricare i file da Google Drive.");
+        }
+    };
 
-  const handleLoadReport = async (file: DriveFile) => {
-    setIsLoading(true);
-    try {
-      const loadedReport = await driveService.loadFile(file.id);
-      setReport(loadedReport);
-      setReportMetadata({ driveId: file.id, name: file.name });
-      
-      const systemMessage: ChatMessage = {
-        id: Date.now().toString() + '-sys',
-        role: 'system',
-        text: `Sopralluogo "${file.name}" caricato. I nuovi rilievi verranno aggiunti a questo contesto.`
-      };
-      setMessages([systemMessage]);
-      
-      const contextForAI = `Sto continuando un sopralluogo precedentemente salvato. Ecco il report attuale in formato JSON: ${JSON.stringify(loadedReport)}. I miei prossimi messaggi saranno aggiunte o modifiche a questo report.`;
-      handleSendMessage(`Ok, sono pronto a continuare dal report caricato.`, undefined, contextForAI);
+    const handleLoadReport = async (file: DriveFile) => {
+        if (window.confirm(`Sei sicuro di voler caricare il report "${file.name}"? Le modifiche non salvate andranno perse.`)) {
+            try {
+                const loadedReport = await driveService.loadFile(file.id);
+                setReport(loadedReport);
+                setCurrentFile(file);
+                startChat(); // Restart chat with new context
+                setMessages([
+                    {
+                        id: 'init-loaded',
+                        role: 'model',
+                        text: `Report "${file.name}" caricato con successo. Può continuare ad aggiungere rilievi.`,
+                    },
+                ]);
+                setIsArchiveOpen(false);
+            } catch (err) {
+                console.error('Failed to load file', err);
+                setError("Impossibile caricare il report selezionato.");
+            }
+        }
+    };
+    
+    const handleDeleteReport = async (fileId: string) => {
+        try {
+            await driveService.deleteFile(fileId);
+            alert("Report eliminato con successo.");
+            if (currentFile?.id === fileId) {
+                handleNewReport(false); // Clear current report if it was deleted
+            }
+            await handleRefreshArchive();
+        } catch (err) {
+            console.error('Failed to delete file', err);
+            setError("Impossibile eliminare il report.");
+        }
+    };
 
-      setIsArchiveOpen(false);
-    } catch (e) {
-      setError('Errore durante il caricamento del report da Google Drive.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const handleNewInspection = () => {
-    if (report.length > 0 && !window.confirm("Sei sicuro di voler iniziare un nuovo sopralluogo? I dati non salvati andranno persi.")) {
-      return;
-    }
-    setReport([]);
-    setReportMetadata({ driveId: null, name: null });
-    setMessages([{
-        id: 'init-new',
-        role: 'system',
-        text: 'Nuovo sopralluogo avviato. Mi dica quale area, macchinario o mansione vuole ispezionare.'
-      }]);
-    startChat(); // Reset AI conversation context
-  };
-  
-  const handleDeleteReport = async (reportId: string) => {
-    try {
-        await driveService.deleteFile(reportId);
-        setDriveFiles(prev => prev.filter(f => f.id !== reportId));
-    } catch (e) {
-        setError('Errore durante l\'eliminazione del file da Google Drive.');
-    }
-  };
+    // Knowledge Base Handlers
+    const handleOpenKnowledgeBase = async () => {
+        await handleRefreshKnowledgeBase();
+        setIsKnowledgeBaseOpen(true);
+    };
 
-  const handleOpenArchive = async () => {
-      setIsLoading(true);
-      try {
-          const files = await driveService.listFiles();
-          setDriveFiles(files);
-          setIsArchiveOpen(true);
-      } catch(e) {
-          setError("Impossibile caricare i file dall'archivio di Google Drive.");
-      } finally {
-          setIsLoading(false);
-      }
-  };
+    const handleRefreshKnowledgeBase = async () => {
+        try {
+            const sources = await jarvisApi.listSources();
+            setKnowledgeSources(sources);
+        } catch(err) {
+            console.error('Failed to list knowledge sources', err);
+            setError("Impossibile caricare le fonti di conoscenza.");
+        }
+    };
 
-  return (
-    <>
-      <div className="h-screen w-screen p-4 flex flex-col bg-jarvis-bg font-sans">
-        <header className="flex items-center justify-between gap-4 pb-4 border-b border-jarvis-text/10">
-          <div className="flex items-center gap-4">
-            <BrainCircuitIcon className="w-10 h-10 text-jarvis-primary"/>
-            <div>
-              <h1 className="text-2xl font-bold text-jarvis-secondary">Jarvis</h1>
-              <p className="text-sm text-jarvis-text-secondary">Assistente per Sopralluoghi di Sicurezza</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {isSignedIn ? (
-                <>
-                    <button onClick={handleNewInspection} className="flex items-center gap-2 bg-jarvis-surface text-jarvis-text-secondary px-4 py-2 rounded-lg hover:bg-jarvis-bg hover:text-jarvis-primary transition-colors" title="Nuovo Sopralluogo">
-                        <PlusIcon className="w-5 h-5"/>
-                        <span className="hidden sm:inline">Nuovo</span>
-                    </button>
-                    <button onClick={handleOpenArchive} className="flex items-center gap-2 bg-jarvis-surface text-jarvis-text-secondary px-4 py-2 rounded-lg hover:bg-jarvis-bg hover:text-jarvis-primary transition-colors" title="Archivio Google Drive">
-                        <ArchiveIcon className="w-5 h-5"/>
-                        <span className="hidden sm:inline">Archivio</span>
-                    </button>
-                    <button onClick={() => setIsKnowledgeModalOpen(true)} className="flex items-center gap-2 bg-jarvis-surface text-jarvis-text-secondary px-4 py-2 rounded-lg hover:bg-jarvis-bg hover:text-jarvis-primary transition-colors" title="Base di Conoscenza">
-                        <DatabaseIcon className="w-5 h-5"/>
-                        <span className="hidden sm:inline">Conoscenza</span>
-                    </button>
-                    <button onClick={handleSignOut} className="flex items-center gap-2 bg-jarvis-surface text-red-400/80 px-4 py-2 rounded-lg hover:bg-jarvis-bg hover:text-red-400 transition-colors" title="Esci">
-                        <LogoutIcon className="w-5 h-5"/>
-                    </button>
-                </>
-            ) : (
-                <button 
-                  onClick={handleSignIn} 
-                  disabled={isSigningIn}
-                  className="flex items-center gap-2 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-70 disabled:cursor-wait"
-                >
-                    <GoogleIcon className="w-5 h-5"/>
-                    <span className="font-medium">{isSigningIn ? 'Accesso in corso...' : 'Accedi con Google'}</span>
-                </button>
+    const handleAddSource = async (source: { uri: string; title: string }) => {
+        try {
+            await jarvisApi.addSource(source.uri, source.title);
+            alert(`Fonte "${source.title}" aggiunta alla base di conoscenza.`);
+            await handleRefreshKnowledgeBase();
+        } catch(err) {
+            console.error('Failed to add source', err);
+            setError("Impossibile aggiungere la fonte.");
+        }
+    };
+
+    const handleDeleteSource = async (sourceId: string) => {
+        try {
+            await jarvisApi.deleteSource(sourceId);
+            alert("Fonte eliminata con successo.");
+            await handleRefreshKnowledgeBase();
+        } catch (err) {
+            console.error('Failed to delete source', err);
+            setError("Impossibile eliminare la fonte.");
+        }
+    };
+
+    const handleNewReport = (confirm = true) => {
+        const doNewReport = () => {
+            setReport([]);
+            setCurrentFile(null);
+            startChat(); // Restart chat for a new session
+            setMessages([
+                {
+                    id: 'init-new',
+                    role: 'model',
+                    text: 'Nuovo report iniziato. Inserisci i dettagli del primo rilievo.',
+                },
+            ]);
+        };
+
+        if (confirm) {
+            if (window.confirm("Sei sicuro di voler iniziare un nuovo report? Le modifiche non salvate andranno perse.")) {
+                doNewReport();
+            }
+        } else {
+            doNewReport();
+        }
+    };
+
+
+    return (
+        <div className="bg-jarvis-bg text-jarvis-text font-sans min-h-screen flex flex-col">
+            <header className="bg-jarvis-surface/80 backdrop-blur-sm sticky top-0 z-10 border-b border-jarvis-text/10 px-6 py-3">
+                <div className="max-w-7xl mx-auto flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <BrainCircuitIcon className="w-8 h-8 text-jarvis-primary" />
+                        <h1 className="text-xl font-bold text-jarvis-primary">Jarvis AI</h1>
+                        {currentFile && <span className="text-sm text-jarvis-text-secondary hidden md:block">| Lavorando su: {currentFile.name}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => handleNewReport()} className="text-sm px-3 py-1.5 rounded-md hover:bg-jarvis-bg">Nuovo Report</button>
+                        <button onClick={handleOpenArchive} className="text-sm px-3 py-1.5 rounded-md hover:bg-jarvis-bg">Archivio Drive</button>
+                        <button onClick={handleOpenKnowledgeBase} className="text-sm px-3 py-1.5 rounded-md hover:bg-jarvis-bg">Conoscenza</button>
+                        {isLoggedIn ? (
+                            <button onClick={handleLogout} className="bg-red-500/20 text-red-400 text-sm px-3 py-1.5 rounded-md hover:bg-red-500/30">Logout</button>
+                        ) : (
+                            <button onClick={handleLogin} className="bg-jarvis-primary/80 text-white text-sm px-3 py-1.5 rounded-md hover:bg-jarvis-primary">Login con Google</button>
+                        )}
+                    </div>
+                </div>
+            </header>
+            
+            <main className="flex-1 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+                <ChatInterface
+                    messages={messages}
+                    onSendMessage={handleSendMessage}
+                    isLoading={isLoading}
+                    onAddSource={handleAddSource}
+                />
+                <ReportView report={report} onSave={handleSaveReport} isLoggedIn={isLoggedIn} />
+            </main>
+
+            {error && (
+                <div className="fixed bottom-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50">
+                    <p>{error}</p>
+                    <button onClick={() => setError(null)} className="absolute top-1 right-2 text-white font-bold">&times;</button>
+                </div>
             )}
-          </div>
-        </header>
-        {error && (
-          <div className="bg-red-500/20 text-red-300 p-3 rounded-lg my-4" role="alert">
-            <strong>Errore:</strong> {error} <button onClick={() => setError(null)} className="float-right font-bold">X</button>
-          </div>
-        )}
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden pt-4">
-          <ChatInterface messages={messages} onSendMessage={handleSendMessage} isLoading={isLoading} onAddSource={handleAddSource} />
-          <ReportView report={report} onSave={handleSaveReport} isLoggedIn={isSignedIn} />
-        </main>
-      </div>
-      <ArchiveModal
-        isOpen={isArchiveOpen}
-        onClose={() => setIsArchiveOpen(false)}
-        reports={driveFiles}
-        onLoad={handleLoadReport}
-        onDelete={handleDeleteReport}
-        onRefresh={handleOpenArchive}
-      />
-      <KnowledgeBaseModal
-        isOpen={isKnowledgeModalOpen}
-        onClose={() => setIsKnowledgeModalOpen(false)}
-      />
-    </>
-  );
+            
+            <ArchiveModal 
+                isOpen={isArchiveOpen}
+                onClose={() => setIsArchiveOpen(false)}
+                reports={driveFiles}
+                onLoad={handleLoadReport}
+                onDelete={handleDeleteReport}
+                onRefresh={handleRefreshArchive}
+            />
+
+            <KnowledgeBaseModal
+                isOpen={isKnowledgeBaseOpen}
+                onClose={() => setIsKnowledgeBaseOpen(false)}
+                sources={knowledgeSources}
+                onDelete={handleDeleteSource}
+                onRefresh={handleRefreshKnowledgeBase}
+            />
+        </div>
+    );
 };
 
 export default App;

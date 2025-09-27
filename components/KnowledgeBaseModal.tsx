@@ -1,40 +1,22 @@
-
-import React, { useState, useRef } from 'react';
-import { uploadKnowledgeDocuments } from '../services/jarvisApi.ts';
+import React from 'react';
+import { KnowledgeSource } from '../types.ts';
+import { TrashIcon } from './icons.tsx';
 
 interface KnowledgeBaseModalProps {
   isOpen: boolean;
   onClose: () => void;
+  sources: KnowledgeSource[];
+  onDelete: (sourceId: string) => void;
+  onRefresh: () => void;
 }
 
-const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose }) => {
-  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose, sources, onDelete, onRefresh }) => {
   if (!isOpen) return null;
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedFiles(event.target.files);
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFiles || selectedFiles.length === 0) {
-      alert("Per favore, seleziona almeno un file da caricare.");
-      return;
-    }
-    setIsUploading(true);
-    try {
-      await uploadKnowledgeDocuments(selectedFiles);
-      setSelectedFiles(null); // Reset input after upload
-      if(fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (error) {
-      console.error("Upload failed", error);
-      alert("Si è verificato un errore durante il caricamento. (Simulazione)");
-    } finally {
-      setIsUploading(false);
+  const handleDelete = (e: React.MouseEvent, sourceId: string) => {
+    e.stopPropagation();
+    if (window.confirm('Sei sicuro di voler rimuovere questa fonte dalla base di conoscenza di Jarvis?')) {
+      onDelete(sourceId);
     }
   };
 
@@ -44,50 +26,55 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
       onClick={onClose}
     >
       <div 
-        className="bg-jarvis-surface w-full max-w-2xl rounded-lg shadow-xl p-6 m-4 flex flex-col max-h-[80vh]"
+        className="bg-jarvis-surface w-full max-w-3xl rounded-lg shadow-xl p-6 m-4 flex flex-col max-h-[80vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-jarvis-primary">Base di Conoscenza</h2>
+            <button onClick={onRefresh} className="text-jarvis-secondary hover:text-jarvis-primary">Aggiorna</button>
         </div>
-        
-        <div className="text-jarvis-text-secondary mb-6">
-            <p>Arricchisca le competenze di Jarvis caricando documenti e normative. I file verranno elaborati e diventeranno la fonte primaria di informazione per le sue analisi, garantendo risposte sempre aggiornate e basate su fonti da lei approvate.</p>
-        </div>
-
-        <div className="bg-jarvis-bg/50 p-4 rounded-lg border border-jarvis-text/10">
-            <h3 className="font-semibold text-lg mb-3 text-jarvis-secondary">Carica Nuovi Documenti</h3>
-            <div className="flex items-center gap-4">
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept=".pdf,.txt,.md,.json"
-                    onChange={handleFileSelect}
-                    className="block w-full text-sm text-jarvis-text-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-jarvis-primary file:text-white hover:file:bg-jarvis-secondary"
-                />
-                <button
-                    onClick={handleUpload}
-                    disabled={!selectedFiles || isUploading}
-                    className="px-6 py-2 bg-jarvis-primary text-white rounded-lg hover:bg-jarvis-secondary disabled:opacity-50 disabled:cursor-wait"
-                >
-                    {isUploading ? 'Caricamento...' : 'Carica'}
-                </button>
+        <p className="text-jarvis-text-secondary mb-4 text-sm">
+            Queste sono le fonti che Jarvis utilizzerà per fornire risposte più accurate e contestualizzate.
+            Puoi aggiungere nuove fonti dai suggerimenti che appaiono nella chat dopo una ricerca web.
+        </p>
+        <div className="flex-1 overflow-y-auto pr-2 border-t border-jarvis-text/10 pt-4">
+          {sources.length > 0 ? (
+            <div className="space-y-3">
+              {sources.map(source => (
+                <div key={source.id} className="bg-jarvis-bg/50 rounded-lg p-4 flex items-center justify-between hover:bg-jarvis-bg transition-colors">
+                  <div className="flex-1 overflow-hidden">
+                    <p className="font-semibold text-jarvis-text truncate" title={source.title}>{source.title}</p>
+                    <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-xs text-jarvis-secondary hover:underline truncate block" title={source.uri}>
+                        {source.uri}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-3 ml-4">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        source.status === 'ready' ? 'bg-green-500/20 text-green-400' :
+                        source.status === 'processing' ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-red-500/20 text-red-400'
+                    }`}>
+                        {source.status}
+                    </span>
+                    <button
+                      onClick={(e) => handleDelete(e, source.id)}
+                      className="p-2 text-jarvis-text-secondary hover:bg-red-500/20 hover:text-red-400 rounded-full"
+                      title="Rimuovi fonte"
+                    >
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
+          ) : (
+            <p className="text-center text-jarvis-text-secondary py-10">La base di conoscenza è vuota.</p>
+          )}
         </div>
-        
-        <div className="mt-6 flex-1 overflow-y-auto pr-2 border-t border-jarvis-text/10 pt-4">
-             <h3 className="font-semibold text-lg mb-3 text-jarvis-secondary">Documenti Caricati</h3>
-             <p className="text-center text-jarvis-text-secondary py-8 italic">
-                (La lista dei documenti caricati e il loro stato di elaborazione apparirà qui nella prossima versione)
-             </p>
-        </div>
-
-
         <div className="mt-6 text-right">
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-jarvis-primary/50 text-white rounded-lg hover:bg-jarvis-primary/80"
+            className="px-6 py-2 bg-jarvis-primary text-white rounded-lg hover:bg-jarvis-secondary"
           >
             Chiudi
           </button>
