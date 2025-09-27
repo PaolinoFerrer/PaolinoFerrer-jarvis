@@ -243,7 +243,8 @@ function App() {
         onDelete={handleDeleteSource}
         onRefresh={loadKnowledgeSources}
         onAddWebSource={handleAddWebSource}
-        onAddFile={onAddFileSource}
+        // Fix: Corrected typo from onAddFileSource to handleAddFileSource to match the defined handler.
+        onAddFile={handleAddFileSource}
       />
 
     </div>

@@ -1,7 +1,19 @@
-// This file is new or was previously empty.
 export interface DpiItem {
   name: string;
   notes?: string;
+}
+
+export interface Finding {
+  id: string;
+  description: string;
+  hazard: string;
+  riskLevel: number;
+  regulation: string;
+  recommendation: string;
+  photo?: {
+    analysis: string;
+    base64?: string; 
+  };
 }
 
 export interface Task {
@@ -18,20 +30,6 @@ export interface Workplace {
 }
 
 export type Report = Workplace[];
-
-
-export interface Finding {
-  id: string;
-  description: string;
-  hazard: string;
-  riskLevel: number;
-  regulation: string;
-  recommendation: string;
-  photo?: {
-    analysis: string;
-    base64?: string; 
-  };
-}
 
 export interface ChatMessage {
   id: string;
