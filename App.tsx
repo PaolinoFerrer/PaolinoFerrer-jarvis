@@ -1,11 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import ChatInterface from './components/ChatInterface.tsx';
 import ReportView from './components/ReportView.tsx';
 import ArchiveModal from './components/ArchiveModal.tsx';
+import KnowledgeBaseModal from './components/KnowledgeBaseModal.tsx';
 import { ChatMessage, Report, DriveFile, ReportMetadata } from './types.ts';
-import { sendChatMessage, startChat } from './services/geminiService.ts';
+import { startChat } from './services/geminiService.ts';
+import { askJarvis } from './services/jarvisApi.ts';
 import * as driveService from './services/googleDriveService.ts';
-import { BrainCircuitIcon, ArchiveIcon, PlusIcon, GoogleIcon, LogoutIcon } from './components/icons.tsx';
+import { BrainCircuitIcon, ArchiveIcon, PlusIcon, GoogleIcon, LogoutIcon, DatabaseIcon } from './components/icons.tsx';
 
 const fileToBase64 = (file: File): Promise<{mimeType: string, data: string}> => {
   return new Promise((resolve, reject) => {
@@ -33,7 +36,10 @@ const App: React.FC = () => {
   const [reportMetadata, setReportMetadata] = useState<ReportMetadata>({ driveId: null, name: null });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Modal states
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [isKnowledgeModalOpen, setIsKnowledgeModalOpen] = useState(false);
   
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -58,7 +64,7 @@ const App: React.FC = () => {
       setMessages([{
         id: 'init-signed-in',
         role: 'system',
-        text: 'Accesso eseguito. Ora può iniziare un nuovo sopralluogo o caricarne uno dall\'archivio.'
+        text: 'Accesso eseguito. Ora può iniziare un nuovo sopralluogo, caricarne uno dall\'archivio, o arricchire la mia base di conoscenza.'
       }]);
     } catch (e) {
       setError('Accesso a Google Drive fallito.');
@@ -104,13 +110,14 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const { conversationalResponse, report: newReportData, sources } = await sendChatMessage(fullMessage, imagePayload);
+      // MODIFICA CHIAVE: Chiamiamo il nuovo servizio API invece di Gemini direttamente
+      const { conversationalResponse, report: newReportData, sources } = await askJarvis(fullMessage, imagePayload);
       
       const botMessage: ChatMessage = {
         id: Date.now().toString() + '-bot',
         role: 'model',
         text: conversationalResponse,
-        sources: sources, // Add sources to the message
+        sources: sources,
       };
 
       setMessages(prev => [...prev, botMessage]);
@@ -265,6 +272,10 @@ const App: React.FC = () => {
                         <ArchiveIcon className="w-5 h-5"/>
                         <span className="hidden sm:inline">Archivio</span>
                     </button>
+                    <button onClick={() => setIsKnowledgeModalOpen(true)} className="flex items-center gap-2 bg-jarvis-surface text-jarvis-text-secondary px-4 py-2 rounded-lg hover:bg-jarvis-bg hover:text-jarvis-primary transition-colors" title="Base di Conoscenza">
+                        <DatabaseIcon className="w-5 h-5"/>
+                        <span className="hidden sm:inline">Conoscenza</span>
+                    </button>
                     <button onClick={handleSignOut} className="flex items-center gap-2 bg-jarvis-surface text-red-400/80 px-4 py-2 rounded-lg hover:bg-jarvis-bg hover:text-red-400 transition-colors" title="Esci">
                         <LogoutIcon className="w-5 h-5"/>
                     </button>
@@ -298,6 +309,10 @@ const App: React.FC = () => {
         onLoad={handleLoadReport}
         onDelete={handleDeleteReport}
         onRefresh={handleOpenArchive}
+      />
+      <KnowledgeBaseModal
+        isOpen={isKnowledgeModalOpen}
+        onClose={() => setIsKnowledgeModalOpen(false)}
       />
     </>
   );

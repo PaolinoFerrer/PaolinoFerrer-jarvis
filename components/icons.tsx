@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export const MicrophoneIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -74,5 +75,13 @@ export const GoogleIcon: React.FC<{ className?: string }> = ({ className }) => (
 export const LogoutIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
         <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+    </svg>
+);
+
+export const DatabaseIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4zm0 6c-3.31 0-6-1.34-6-3s2.69-3 6-3 6 1.34 6 3-2.69 3-6 3z"/>
+        <path d="M4 11v4c0 2.21 3.58 4 8 4s8-1.79 8-4v-4c-1.48.83-4.47 1.5-8 1.5s-6.52-.67-8-1.5z"/>
+        <path d="M4 17v4c0 2.21 3.58 4 8 4s8-1.79 8-4v-4c-1.48.83-4.47 1.5-8 1.5s-6.52-.67-8-1.5z"/>
     </svg>
 );
