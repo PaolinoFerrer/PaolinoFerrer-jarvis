@@ -104,12 +104,13 @@ const App: React.FC = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const { conversationalResponse, report: newReportData } = await sendChatMessage(fullMessage, imagePayload);
+      const { conversationalResponse, report: newReportData, sources } = await sendChatMessage(fullMessage, imagePayload);
       
       const botMessage: ChatMessage = {
         id: Date.now().toString() + '-bot',
         role: 'model',
-        text: conversationalResponse
+        text: conversationalResponse,
+        sources: sources, // Add sources to the message
       };
 
       setMessages(prev => [...prev, botMessage]);

@@ -98,30 +98,9 @@ function gisLoaded() {
   }
 }
 
-// Carica gli script dinamicamente se non già presenti
-if (typeof gapi === 'undefined') {
-    const gapiScript = document.createElement('script');
-    gapiScript.src = 'https://apis.google.com/js/api.js';
-    gapiScript.async = true;
-    gapiScript.defer = true;
-    gapiScript.onload = gapiLoaded;
-    gapiScript.onerror = () => rejectReady(new Error("Impossibile caricare lo script dell'API di Google."));
-    document.body.appendChild(gapiScript);
-} else {
-    gapiLoaded();
-}
-
-if(typeof google === 'undefined'){
-    const gisScript = document.createElement('script');
-    gisScript.src = 'https://accounts.google.com/gsi/client';
-    gisScript.async = true;
-    gisScript.defer = true;
-    gisScript.onload = gisLoaded;
-    gisScript.onerror = () => rejectReady(new Error("Impossibile caricare lo script di identità di Google."));
-    document.body.appendChild(gisScript);
-} else {
-    gisLoaded();
-}
+// FIX: Make callbacks globally available for the onload attributes in index.html
+(window as any).gapiLoaded = gapiLoaded;
+(window as any).gisLoaded = gisLoaded;
 
 
 /**

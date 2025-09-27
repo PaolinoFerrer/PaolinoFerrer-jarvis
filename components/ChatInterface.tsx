@@ -77,6 +77,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
             <div className={`max-w-md lg:max-w-xl p-4 rounded-2xl ${msg.role === 'user' ? 'bg-jarvis-primary/80 text-white rounded-br-none' : 'bg-jarvis-bg text-jarvis-text rounded-bl-none'}`}>
               <p className="whitespace-pre-wrap">{msg.text}</p>
               {msg.photo && <img src={msg.photo} alt="Allegato" className="mt-2 rounded-lg max-h-48 w-auto" />}
+              {msg.sources && msg.sources.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-jarvis-text/10">
+                  <h4 className="text-xs font-bold text-jarvis-text-secondary mb-1">Fonti:</h4>
+                  <ul className="text-xs space-y-1">
+                    {msg.sources.map((source, index) => (
+                      <li key={index}>
+                        <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-jarvis-secondary hover:underline truncate block">
+                          {source.title || source.uri}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         ))}

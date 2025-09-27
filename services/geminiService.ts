@@ -1,4 +1,4 @@
-import { GoogleGenAI, Chat, Type, Part } from "@google/genai";
+import { GoogleGenAI, Chat, Type, Part, GenerateContentResponse } from "@google/genai";
 import { Report } from '../types.ts';
 
 let ai: GoogleGenAI;
@@ -17,13 +17,14 @@ const systemInstruction = `Sei "Jarvis", un assistente AI specializzato in sicur
 Le tue responsabilità sono:
 1.  **Mantenere il Contesto**: Ricorda sempre l'area, il macchinario o la mansione corrente. Se l'utente dice "Iniziamo il sopralluogo in...", crea una nuova sezione nel report con quel titolo. Se dice "passiamo a...", crea un'altra nuova sezione.
 2.  **Analizzare i Rilievi**: Quando l'utente descrive un problema, analizza il testo e qualsiasi immagine fornita.
-3.  **Rispondere in JSON**: La tua risposta DEVE SEMPRE includere la struttura JSON completa e aggiornata del report. Oltre al JSON, fornisci una breve risposta testuale conversazionale (massimo 2 frasi) per confermare l'analisi.
-4.  **Struttura Dati**: Per ogni rilievo, devi estrarre o dedurre:
+3.  **Usare la Ricerca Web**: Per normative specifiche, recenti o tecniche (es. Accordi Stato-Regioni 2024/2025, norme UNI/CEI, normative antincendio), DEVI utilizzare la ricerca web per fornire le informazioni più aggiornate e precise.
+4.  **Rispondere in JSON**: La tua risposta DEVE SEMPRE includere la struttura JSON completa e aggiornata del report. Oltre al JSON, fornisci una breve risposta testuale conversazionale (massimo 2 frasi) per confermare l'analisi.
+5.  **Struttura Dati**: Per ogni rilievo, devi estrarre o dedurre:
     -   \`id\`: Un ID univoco (es. timestamp).
     -   \`description\`: La descrizione del rilievo.
     -   \`hazard\`: Il pericolo specifico (es. "Contatto elettrico diretto").
     -   \`riskLevel\`: Una stima del rischio da 1 a 10.
-    -   \`regulation\`: La normativa di riferimento (es. "D.Lgs. 81/08, Titolo III").
+    -   \`regulation\`: La normativa di riferimento (es. "D.Lgs. 81/08, Titolo III"). Se usi la ricerca, cita la fonte.
     -   \`recommendation\`: Un'azione correttiva suggerita.
     -   \`photoAnalysis\`: Se viene fornita un'immagine, descrivi brevemente ciò che è rilevante per il rischio.
 
@@ -83,6 +84,7 @@ export function startChat() {
             systemInstruction: systemInstruction,
             responseMimeType: "application/json",
             responseSchema: reportSchema,
+            tools: [{googleSearch: {}}], // Enable Google Search
         },
     });
 }
@@ -90,7 +92,11 @@ export function startChat() {
 export async function sendChatMessage(
     message: string,
     image?: { mimeType: string; data: string }
-): Promise<{ conversationalResponse: string; report: Report }> {
+): Promise<{ 
+    conversationalResponse: string; 
+    report: Report;
+    sources?: { uri: string; title: string }[];
+}> {
     if (!chat) {
         startChat();
     }
@@ -106,13 +112,24 @@ export async function sendChatMessage(
     }
     parts.push({ text: message });
 
-    // FIX: The sendMessage method expects an object with a 'message' property
-    // containing the parts, not the parts array directly.
-    const response = await chat.sendMessage({ message: parts });
+    const response: GenerateContentResponse = await chat.sendMessage({ message: parts });
     
     try {
         const jsonText = response.text.trim();
         const parsed = JSON.parse(jsonText);
+        
+        // Extract grounding sources if available
+        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+        if (groundingMetadata?.groundingChunks) {
+             const sources = groundingMetadata.groundingChunks
+                .filter(chunk => chunk.web)
+                .map(chunk => ({
+                    uri: chunk.web.uri,
+                    title: chunk.web.title,
+                }));
+             parsed.sources = sources;
+        }
+
         return parsed;
     } catch (e) {
         console.error("Failed to parse JSON response from Gemini:", response.text);

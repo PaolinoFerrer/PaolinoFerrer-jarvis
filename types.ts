@@ -22,7 +22,7 @@ export interface ReportSection {
 export type Report = ReportSection[];
 
 export interface SavedReport {
-  id: string; // timestamp
+  id:string; // timestamp
   name: string;
   savedAt: string; // ISO date string
   report: Report;
@@ -33,6 +33,7 @@ export interface ChatMessage {
   role: 'user' | 'model' | 'system';
   text: string;
   photo?: string; // data URL for image
+  sources?: { uri: string; title: string }[]; // NEW: For Google Search grounding results
 }
 
 export interface DriveFile {

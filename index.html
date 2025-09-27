@@ -40,5 +40,9 @@
   <body class="bg-jarvis-bg text-jarvis-text">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    
+    <!-- FIX: Robust script loading for Google APIs -->
+    <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
   </body>
 </html>
