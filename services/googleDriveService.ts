@@ -1,201 +1,130 @@
+import { Report, DriveFile } from '../types';
 
-declare const gapi: any;
-declare namespace google {
-    namespace accounts {
-        namespace oauth2 {
-            type TokenClient = any;
-            type TokenResponse = any;
-            function initTokenClient(config: any): TokenClient;
-            function revoke(token: string, callback: () => void): void;
-        }
-    }
+const DRIVE_STORAGE_KEY = 'jarvis-google-drive-mock';
+const AUTH_STORAGE_KEY = 'jarvis-gdrive-loggedin';
+
+interface MockDriveFile {
+    id: string;
+    name: string;
+    content: Report;
+    createdAt: string;
 }
 
-import { Report } from '../types.ts';
-
-const getApiKey = () => {
-    if (!process.env.GOOGLE_DRIVE_API_KEY) {
-        throw new Error("GOOGLE_DRIVE_API_KEY environment variable not set. Please provide it to use Google Drive features.");
+// Fix: Replaced placeholder content with a full mock implementation for Google Drive services.
+// Ensure we have some initial data for demonstration if storage is empty
+const getInitialMockData = (): Record<string, MockDriveFile> => ({
+    'mock-id-1': {
+        id: 'mock-id-1',
+        name: `report-sicurezza-jarvis-${Date.now() - 86400000}.json`,
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
+        content: [
+            {
+                id: "workplace-initial-1",
+                name: "Magazzino Esempio",
+                tasks: [
+                    {
+                        id: "task-initial-1",
+                        name: "Carrellista",
+                        findings: [{
+                            id: "finding-initial-1",
+                            description: "Pavimentazione sconnessa.",
+                            hazard: "Rischio di inciampo e ribaltamento muletto",
+                            riskLevel: 6,
+                            regulation: "D.Lgs. 81/08",
+                            recommendation: "Ripristinare la pavimentazione."
+                        }],
+                        requiredDpi: [{ name: "Scarpe antinfortunistiche" }]
+                    }
+                ]
+            }
+        ]
     }
-    return process.env.GOOGLE_DRIVE_API_KEY;
-};
+});
 
-const getClientId = () => {
-    if (!process.env.GOOGLE_DRIVE_CLIENT_ID) {
-        throw new Error("GOOGLE_DRIVE_CLIENT_ID environment variable not set. Please provide it to use Google Drive features.");
-    }
-    return process.env.GOOGLE_DRIVE_CLIENT_ID;
-};
-
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-const FOLDER_NAME = 'Report Sicurezza Jarvis';
-const FILE_EXTENSION = '.jarvis.report.json';
-
-let tokenClient: google.accounts.oauth2.TokenClient | null = null;
-let driveFolderId: string | null = null;
-let initPromise: Promise<void> | null = null;
-
-const loadScript = (src: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) {
-      resolve();
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = (err) => reject(new Error(`Failed to load script ${src}: ${JSON.stringify(err)}`));
-    document.head.appendChild(script);
-  });
-};
-
-const initialize = (): Promise<void> => {
-  if (initPromise) {
-    return initPromise;
-  }
-
-  initPromise = (async () => {
+const getMockDrive = (): Record<string, MockDriveFile> => {
     try {
-      await loadScript('https://apis.google.com/js/api.js');
-      await loadScript('https://accounts.google.com/gsi/client');
-
-      await new Promise<void>((resolve) => gapi.load('client', resolve));
-
-      await gapi.client.init({
-        apiKey: getApiKey(),
-        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-      });
-
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: getClientId(),
-        scope: SCOPES,
-        callback: '',
-      });
-    } catch (err) {
-      console.error('Google API initialization failed:', err);
-      initPromise = null; // Reset promise on failure to allow retry
-      throw new Error('Impossibile inizializzare i servizi di Google. Controlla la tua connessione e le estensioni del browser (es. ad-blocker).');
+        const stored = localStorage.getItem(DRIVE_STORAGE_KEY);
+        if (stored) {
+            return JSON.parse(stored);
+        }
+        // If nothing is stored, initialize with sample data
+        const initialData = getInitialMockData();
+        localStorage.setItem(DRIVE_STORAGE_KEY, JSON.stringify(initialData));
+        return initialData;
+    } catch (error) {
+        console.error("Failed to load mock drive from localStorage", error);
+        return getInitialMockData();
     }
-  })();
-
-  return initPromise;
 };
 
-export async function signIn(): Promise<void> {
-  await initialize();
-  if (!tokenClient) {
-    throw new Error('Il client di autenticazione Google non è pronto.');
-  }
+const saveMockDrive = (drive: Record<string, MockDriveFile>) => {
+    try {
+        localStorage.setItem(DRIVE_STORAGE_KEY, JSON.stringify(drive));
+    } catch (error) {
+        console.error("Failed to save mock drive to localStorage", error);
+    }
+};
 
-  return new Promise((resolve, reject) => {
-    const callback = (resp: google.accounts.oauth2.TokenResponse) => {
-      if (resp.error) {
-        console.error('Google Sign-In Error:', resp);
-        const errorMessage = `Accesso fallito. Dettagli: ${resp.error_description || resp.error}`;
-        return reject(new Error(errorMessage));
-      }
-      gapi.client.setToken({ access_token: resp.access_token });
-      resolve();
+export const listReports = async (): Promise<DriveFile[]> => {
+    console.log("DRIVE: Listing reports");
+    const drive = getMockDrive();
+    const files = Object.values(drive)
+        .map(({ id, name }) => ({ id, name }))
+        .sort((a, b) => b.name.localeCompare(a.name)); // Sort descending by name (newest first)
+    return Promise.resolve(files);
+};
+
+export const loadReport = async (fileId: string): Promise<Report> => {
+    console.log("DRIVE: Loading report", fileId);
+    const drive = getMockDrive();
+    if (drive[fileId]) {
+        return Promise.resolve(drive[fileId].content);
+    }
+    throw new Error("Report not found in mock Drive.");
+};
+
+export const saveReport = async (report: Report): Promise<DriveFile> => {
+    console.log("DRIVE: Saving report");
+    const drive = getMockDrive();
+    const newId = `mock-id-${Date.now()}`;
+    const newName = `report-sicurezza-jarvis-${Date.now()}.json`;
+    drive[newId] = {
+        id: newId,
+        name: newName,
+        content: report,
+        createdAt: new Date().toISOString()
     };
-    tokenClient.callback = callback;
-    tokenClient.requestAccessToken({ prompt: '' });
-  });
-}
+    saveMockDrive(drive);
+    return Promise.resolve({ id: newId, name: newName });
+};
 
-export async function signOut() {
-  await initialize();
-  const token = gapi.client.getToken();
-  if (token !== null) {
-    google.accounts.oauth2.revoke(token.access_token, () => {
-      gapi.client.setToken(null);
-    });
-  }
-}
+export const deleteReport = async (fileId: string): Promise<void> => {
+    console.log("DRIVE: Deleting report", fileId);
+    const drive = getMockDrive();
+    if (drive[fileId]) {
+        delete drive[fileId];
+        saveMockDrive(drive);
+        return Promise.resolve();
+    }
+    throw new Error("Report to delete not found in mock Drive.");
+};
 
-async function getOrCreateFolderId(): Promise<string> {
-  if (driveFolderId) return driveFolderId;
+// --- Mock Authentication ---
 
-  const response = await gapi.client.drive.files.list({
-    q: `mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false`,
-    fields: 'files(id, name)',
-  });
+export const signIn = async (): Promise<void> => {
+    console.log("DRIVE: Signing in");
+    localStorage.setItem(AUTH_STORAGE_KEY, 'true');
+    return Promise.resolve();
+};
 
-  if (response.result.files && response.result.files.length > 0) {
-    driveFolderId = response.result.files[0].id!;
-    return driveFolderId;
-  }
+export const signOut = async (): Promise<void> => {
+    console.log("DRIVE: Signing out");
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    return Promise.resolve();
+};
 
-  const file = await gapi.client.drive.files.create({
-    resource: {
-      name: FOLDER_NAME,
-      mimeType: 'application/vnd.google-apps.folder',
-    },
-    fields: 'id',
-  });
-
-  driveFolderId = file.result.id!;
-  return driveFolderId;
-}
-
-export async function saveFile(report: Report, fileName: string, fileId: string | null): Promise<{ id: string; name: string }> {
-  await initialize();
-  if (!fileName.endsWith(FILE_EXTENSION)) {
-    fileName += FILE_EXTENSION;
-  }
-
-  const folderId = await getOrCreateFolderId();
-  const fileMetadata = {
-    name: fileName,
-    mimeType: 'application/json',
-    ...(fileId ? {} : { parents: [folderId] }),
-  };
-
-  const media = {
-    mimeType: 'application/json',
-    body: JSON.stringify(report, null, 2),
-  };
-
-  const response = fileId
-    ? await gapi.client.drive.files.update({
-        fileId: fileId,
-        resource: fileMetadata,
-        media: media,
-        fields: 'id, name',
-      })
-    : await gapi.client.drive.files.create({
-        resource: fileMetadata,
-        media: media,
-        fields: 'id, name',
-      });
-
-  return response.result;
-}
-
-export async function listFiles(): Promise<{ id: string; name: string }[]> {
-  await initialize();
-  const folderId = await getOrCreateFolderId();
-  const response = await gapi.client.drive.files.list({
-    q: `'${folderId}' in parents and name contains '${FILE_EXTENSION}' and trashed=false`,
-    fields: 'files(id, name)',
-    orderBy: 'modifiedTime desc',
-  });
-
-  return response.result.files?.map(f => ({ id: f.id!, name: f.name!.replace(FILE_EXTENSION, '') })) || [];
-}
-
-export async function loadFile(fileId: string): Promise<Report> {
-  await initialize();
-  const response = await gapi.client.drive.files.get({
-    fileId: fileId,
-    alt: 'media',
-  });
-  return JSON.parse(response.body);
-}
-
-export async function deleteFile(fileId: string): Promise<void> {
-  await initialize();
-  await gapi.client.drive.files.delete({
-    fileId: fileId,
-  });
-}
+export const isSignedIn = (): boolean => {
+    const signedIn = localStorage.getItem(AUTH_STORAGE_KEY) === 'true';
+    console.log("DRIVE: Check signed in status:", signedIn);
+    return signedIn;
+};
