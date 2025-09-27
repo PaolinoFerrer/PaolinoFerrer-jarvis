@@ -100,8 +100,7 @@ export async function sendChatMessage(
     }
     parts.push({ text: message });
 
-    // FIX: The `chat.sendMessage` method expects an object with a `message`
-    // property containing the parts, not the parts array directly.
+    // FIX: The `sendMessage` method expects an object with a `message` property that contains the parts.
     const response = await chat.sendMessage({ message: parts });
     
     try {

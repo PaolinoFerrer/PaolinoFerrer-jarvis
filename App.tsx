@@ -70,32 +70,38 @@ const App: React.FC = () => {
 
       setMessages(prev => [...prev, botMessage]);
 
-      // Add base64 photo data to the new report from the user message
-      const updatedReportWithPhotos = newReportData.map(section => ({
-        ...section,
-        findings: section.findings.map(finding => {
-          const originalFinding = report.flatMap(s => s.findings).find(f => f.id === finding.id);
-          if (originalFinding?.photo) {
-            return { ...finding, photo: originalFinding.photo };
-          }
-          if (userMessage.photo && newReportData.flatMap(s => s.findings).some(f => f.id === finding.id)) {
-             const latestFindingId = [...section.findings].sort((a,b) => b.id.localeCompare(a.id))[0].id;
-             if (finding.id === latestFindingId && finding.photo?.analysis) {
-                return {...finding, photo: { base64: userMessage.photo, analysis: finding.photo.analysis }}
-             }
-          }
-          return finding;
-        })
-      }));
+      // Process the report to merge photo data
+      const processedReport = newReportData.map(newSection => {
+          const oldSection = report.find(s => s.title === newSection.title);
+          return {
+              ...newSection,
+              findings: newSection.findings.map(newFinding => {
+                  // Preserve photo from old report if it exists
+                  const oldFinding = oldSection?.findings.find(f => f.id === newFinding.id);
+                  if (oldFinding?.photo?.base64 && newFinding.photo) {
+                      return {
+                          ...newFinding,
+                          photo: {
+                              analysis: newFinding.photo.analysis,
+                              base64: oldFinding.photo.base64,
+                          }
+                      };
+                  }
+                  return newFinding;
+              })
+          };
+      });
 
-      // This logic tries to find the latest finding and attach the photo to it.
-      // A more robust solution might require Gemini to return an ID to which the photo belongs.
+      // If a new photo was sent, find the newest finding that has photo analysis
+      // and attach the base64 data to it.
       if (userMessage.photo) {
           let photoAttached = false;
-          for (let i = updatedReportWithPhotos.length - 1; i >= 0 && !photoAttached; i--) {
-              const section = updatedReportWithPhotos[i];
+          // Iterate backwards to find the newest finding first
+          for (let i = processedReport.length - 1; i >= 0 && !photoAttached; i--) {
+              const section = processedReport[i];
               for (let j = section.findings.length - 1; j >= 0 && !photoAttached; j--) {
                   const finding = section.findings[j];
+                  // A finding that has analysis but no base64 is the one we're looking for
                   if (finding.photo && finding.photo.analysis && !finding.photo.base64) {
                       finding.photo.base64 = userMessage.photo;
                       photoAttached = true;
@@ -104,8 +110,7 @@ const App: React.FC = () => {
           }
       }
 
-
-      setReport(updatedReportWithPhotos);
+      setReport(processedReport);
 
     } catch (e) {
       const err = e as Error;
