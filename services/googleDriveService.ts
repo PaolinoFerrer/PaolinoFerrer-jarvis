@@ -1,19 +1,36 @@
 // FIX: Add declarations for gapi and google to resolve TypeScript errors
 // about them not being defined. These are loaded from external scripts.
 declare const gapi: any;
-declare const google: any;
+// FIX: Replaced 'declare const google: any' with a proper namespace declaration
+// to allow TypeScript to resolve types like 'google.accounts.oauth2.TokenClient'
+// and functions like 'google.accounts.oauth2.initTokenClient'.
+declare namespace google {
+    namespace accounts {
+        namespace oauth2 {
+            type TokenClient = any;
+            type TokenResponse = any;
+
+            function initTokenClient(config: any): TokenClient;
+            function revoke(token: string, callback: () => void): void;
+        }
+    }
+}
 
 import { Report } from '../types.ts';
 
-if (!process.env.GOOGLE_DRIVE_API_KEY) {
-    throw new Error("GOOGLE_DRIVE_API_KEY environment variable not set. Please provide it to use Google Drive features.");
-}
-if (!process.env.GOOGLE_DRIVE_CLIENT_ID) {
-    throw new Error("GOOGLE_DRIVE_CLIENT_ID environment variable not set. Please provide it to use Google Drive features.");
-}
+const getApiKey = () => {
+    if (!process.env.GOOGLE_DRIVE_API_KEY) {
+        throw new Error("GOOGLE_DRIVE_API_KEY environment variable not set. Please provide it to use Google Drive features.");
+    }
+    return process.env.GOOGLE_DRIVE_API_KEY;
+};
 
-const API_KEY = process.env.GOOGLE_DRIVE_API_KEY;
-const CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID;
+const getClientId = () => {
+    if (!process.env.GOOGLE_DRIVE_CLIENT_ID) {
+        throw new Error("GOOGLE_DRIVE_CLIENT_ID environment variable not set. Please provide it to use Google Drive features.");
+    }
+    return process.env.GOOGLE_DRIVE_CLIENT_ID;
+};
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 const FOLDER_NAME = 'Report Sicurezza Jarvis';
@@ -35,23 +52,32 @@ function gapiLoaded() {
  * Inizializza il client GAPI.
  */
 async function initializeGapiClient() {
-  await gapi.client.init({
-    apiKey: API_KEY,
-    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-  });
-  gapiInited = true;
+  try {
+    await gapi.client.init({
+      apiKey: getApiKey(),
+      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+    });
+    gapiInited = true;
+  } catch(e) {
+    console.error("Failed to initialize Google API Client", e);
+    // Non bloccare l'app, ma le funzioni di Drive non funzioneranno.
+  }
 }
 
 /**
  * Funzione di callback chiamata al caricamento dello script GIS.
  */
 function gisLoaded() {
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: '', // Il callback viene gestito dalla promise nella funzione signIn
-  });
-  gisInited = true;
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: getClientId(),
+      scope: SCOPES,
+      callback: '', // Il callback viene gestito dalla promise nella funzione signIn
+    });
+    gisInited = true;
+  } catch(e) {
+    console.error("Failed to initialize Google Identity Services", e);
+  }
 }
 
 // Carica gli script dinamicamente se non già presenti
@@ -85,8 +111,8 @@ export const isReady = () => gapiInited && gisInited;
  */
 export function signIn(): Promise<void> {
     return new Promise((resolve, reject) => {
-        if (!tokenClient) {
-            return reject(new Error('Google Identity Services non è pronto.'));
+        if (!tokenClient || !gapiInited) {
+            return reject(new Error('I servizi Google non sono pronti. Riprova tra poco.'));
         }
 
         const callback = (resp: google.accounts.oauth2.TokenResponse) => {

@@ -39,8 +39,13 @@ const App: React.FC = () => {
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   
   useEffect(() => {
-    // Initialize AI chat on component mount
-    startChat();
+    try {
+      // Initialize AI chat on component mount
+      startChat();
+    } catch (e) {
+      const err = e as Error;
+      setError(`Errore critico nell'inizializzazione dell'AI: ${err.message}`);
+    }
   }, []);
 
   const handleSignIn = async () => {

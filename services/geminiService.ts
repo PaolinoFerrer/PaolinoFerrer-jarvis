@@ -1,11 +1,16 @@
 import { GoogleGenAI, Chat, Type, Part } from "@google/genai";
 import { Report } from '../types.ts';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let ai: GoogleGenAI;
+const getAi = () => {
+    if (!ai) {
+        if (!process.env.API_KEY) {
+            throw new Error("La chiave API di Gemini non è configurata. L'applicazione non può funzionare.");
+        }
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return ai;
+};
 
 const systemInstruction = `Sei "Jarvis", un assistente AI specializzato in sicurezza sul lavoro, basato su D.Lgs. 81/08 e normative correlate. Il tuo compito è assistere un professionista durante un sopralluogo, compilando un Documento di Valutazione dei Rischi (DVR) in tempo reale.
 
@@ -71,7 +76,8 @@ const reportSchema = {
 let chat: Chat;
 
 export function startChat() {
-    chat = ai.chats.create({
+    const currentAi = getAi();
+    chat = currentAi.chats.create({
         model: 'gemini-2.5-flash',
         config: {
             systemInstruction: systemInstruction,
@@ -100,7 +106,9 @@ export async function sendChatMessage(
     }
     parts.push({ text: message });
 
-    const response = await chat.sendMessage(parts);
+    // FIX: The sendMessage method expects an object with a 'message' property
+    // containing the parts, not the parts array directly.
+    const response = await chat.sendMessage({ message: parts });
     
     try {
         const jsonText = response.text.trim();
