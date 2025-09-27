@@ -75,7 +75,16 @@ const App: React.FC = () => {
         setMessages((prev) => [...prev, userMessage]);
 
         try {
-            const { conversationalResponse, report: newReport, sources } = await sendChatMessage(text, imagePayload);
+            // FIX: Pass the current knowledge base to the AI (simulated via API call here)
+            // In a real RAG system, this would happen on the backend.
+            // For now, we prepend it to the user's message as context.
+            const knowledgeContext = knowledgeSources.length > 0
+                ? `Contesto dalla base di conoscenza:\n${knowledgeSources.map(s => `- ${s.title}: ${s.uri}`).join('\n')}\n\nUser:`
+                : '';
+            const messageWithContext = `${knowledgeContext}${text}`;
+
+
+            const { conversationalResponse, report: newReport, sources } = await sendChatMessage(messageWithContext, imagePayload);
             
             if (imagePayload) {
                 // Heuristic to find the finding related to the photo and attach the photo data for display in the report
@@ -97,12 +106,15 @@ const App: React.FC = () => {
 
             setReport(newReport);
 
+            // Filter out sources that are already in our knowledge base from suggestions
+            const newSuggestedSources = sources?.filter(s => s.uri && !knowledgeSources.some(ks => ks.uri === s.uri));
+
             const modelMessage: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'model',
                 text: conversationalResponse,
                 sources: sources?.filter(s => s.uri),
-                suggestedSources: sources?.filter(s => s.uri)
+                suggestedSources: newSuggestedSources
             };
             
             setMessages((prev) => [...prev, modelMessage]);
@@ -117,7 +129,7 @@ const App: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [report]);
+    }, [report, knowledgeSources]);
 
     // Google Drive Handlers
     const handleLogin = async () => {
@@ -227,7 +239,7 @@ const App: React.FC = () => {
         }
     };
 
-    const handleAddSource = async (source: { uri: string; title: string }) => {
+    const handleAddWebSource = async (source: { uri: string; title: string }) => {
         try {
             await jarvisApi.addSource(source.uri, source.title);
             alert(`Fonte "${source.title}" aggiunta alla base di conoscenza.`);
@@ -237,6 +249,18 @@ const App: React.FC = () => {
             setError("Impossibile aggiungere la fonte.");
         }
     };
+    
+    const handleAddFileFromUpload = async (file: File) => {
+        try {
+            await jarvisApi.addFile(file);
+            alert(`File "${file.name}" aggiunto alla base di conoscenza.`);
+            await handleRefreshKnowledgeBase();
+        } catch(err) {
+            console.error('Failed to add file source', err);
+            setError("Impossibile aggiungere il file alla fonte.");
+        }
+    };
+
 
     const handleDeleteSource = async (sourceId: string) => {
         try {
@@ -300,7 +324,7 @@ const App: React.FC = () => {
                     messages={messages}
                     onSendMessage={handleSendMessage}
                     isLoading={isLoading}
-                    onAddSource={handleAddSource}
+                    onAddSource={handleAddWebSource}
                 />
                 <ReportView report={report} onSave={handleSaveReport} isLoggedIn={isLoggedIn} />
             </main>
@@ -327,6 +351,8 @@ const App: React.FC = () => {
                 sources={knowledgeSources}
                 onDelete={handleDeleteSource}
                 onRefresh={handleRefreshKnowledgeBase}
+                onAddWebSource={handleAddWebSource}
+                onAddFile={handleAddFileFromUpload}
             />
         </div>
     );

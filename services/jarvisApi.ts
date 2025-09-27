@@ -26,16 +26,12 @@ export const listSources = async (): Promise<KnowledgeSource[]> => {
 };
 
 export const addSource = async (uri: string, title: string): Promise<KnowledgeSource> => {
-    console.log('API: Adding source', { uri, title });
-    // In a real app:
-    // const response = await fetch(API_ENDPOINT, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ uri, title, type: 'web' })
-    // });
-    // if (!response.ok) throw new Error('Failed to add source');
-    // return response.json();
-
+    console.log('API: Adding web source', { uri, title });
+    if (mockKnowledgeBase.some(s => s.uri === uri)) {
+         console.log('API: Source already exists');
+         const existing = mockKnowledgeBase.find(s => s.uri === uri)!;
+         return Promise.resolve(existing);
+    }
     const newSource: KnowledgeSource = {
         id: Date.now().toString(),
         type: 'web',
@@ -47,6 +43,27 @@ export const addSource = async (uri: string, title: string): Promise<KnowledgeSo
     mockKnowledgeBase.push(newSource);
     return Promise.resolve(newSource);
 };
+
+
+export const addFile = async (file: File): Promise<KnowledgeSource> => {
+    console.log('API: Adding file source', { name: file.name, size: file.size });
+    if (mockKnowledgeBase.some(s => s.title === file.name && s.type === 'file')) {
+        console.log('API: File already exists');
+        const existing = mockKnowledgeBase.find(s => s.title === file.name && s.type === 'file')!;
+        return Promise.resolve(existing);
+    }
+    const newSource: KnowledgeSource = {
+        id: Date.now().toString(),
+        type: 'file',
+        uri: `file://${file.name}`, // Mock URI
+        title: file.name,
+        status: 'ready', // Mocking as instantly ready
+        createdAt: new Date().toISOString()
+    };
+    mockKnowledgeBase.push(newSource);
+    return Promise.resolve(newSource);
+};
+
 
 export const deleteSource = async (sourceId: string): Promise<void> => {
     console.log('API: Deleting source', sourceId);

@@ -29,11 +29,9 @@ Le tue responsabilità sono:
 
 3.  **Usare la Ricerca Web**: Per normative specifiche, recenti o tecniche (es. Accordi Stato-Regioni, norme UNI/CEI, normative antincendio), DEVI utilizzare la ricerca web per fornire le informazioni più aggiornate e precise, dando priorità a fonti istituzionali (es. gazzettaufficiale.it, ispettorato.gov.it, inail.it).
 
-4.  **Rispondere in JSON**: La tua risposta DEVE SEMPRE contenere un blocco di codice JSON valido, marcato con \`\`\`json ... \`\`\`. Questo blocco JSON è l'unica cosa che devi restituire.
+4.  **Struttura JSON**: Il JSON deve avere la seguente struttura: \`{ "conversationalResponse": "Una breve risposta testuale per l'utente", "report": [...] }\`. Il campo "report" deve contenere l'array completo e aggiornato con TUTTE E 6 le sezioni e i relativi rilievi.
 
-5.  **Struttura JSON**: Il JSON deve avere la seguente struttura: \`{ "conversationalResponse": "Una breve risposta testuale per l'utente", "report": [...] }\`. Il campo "report" deve contenere l'array completo e aggiornato con TUTTE E 6 le sezioni e i relativi rilievi.
-
-6.  **Struttura Dati per Rilievo**: Per ogni rilievo, specialmente nelle prime tre sezioni, devi estrarre o dedurre:
+5.  **Struttura Dati per Rilievo**: Per ogni rilievo, specialmente nelle prime tre sezioni, devi estrarre o dedurre:
     -   \`id\`: Un ID univoco (es. timestamp).
     -   \`description\`: La descrizione del rilievo o del requisito.
     -   \`hazard\`: Il pericolo specifico (es. "Contatto elettrico diretto"). Per le sezioni DPI/Formazione/Sorveglianza, puoi usare "Non conformità" o "Requisito".
@@ -42,9 +40,12 @@ Le tue responsabilità sono:
     -   \`recommendation\`: Un'azione correttiva o un dettaglio sul requisito.
     -   \`photoAnalysis\`: Se viene fornita un'immagine, descrivi brevemente ciò che è rilevante per il rischio.
 
-7.  **Flusso di Lavoro**: Prima analizzi la richiesta. Poi, se necessario, usi la ricerca web. Infine, DEVI usare TUTTE le informazioni raccolte (input utente e fonti web) per generare il report JSON completo come descritto sopra. La tua risposta finale è SOLO e SEMPRE il blocco JSON.
+6.  **Flusso di Lavoro**: Prima analizzi la richiesta. Poi, se necessario, usi la ricerca web. Infine, DEVI usare TUTTE le informazioni raccolte (input utente e fonti web) per generare il report JSON completo.
 
-Inizia la conversazione salutando e chiedendo di iniziare. Mantieni un tono professionale e di supporto. Quando l'utente inizia, crea immediatamente la struttura vuota del report con le 6 sezioni e attendi i dettagli.`;
+7.  **Regola Critica - Formato di Risposta**: La tua risposta DEVE essere ESCLUSIVAMENTE un blocco di codice JSON valido, marcato con \`\`\`json ... \`\`\`. NON devi scrivere NESSUN testo, saluto o commento al di fuori di questo blocco JSON. L'unica parte conversazionale permessa è il valore della chiave "conversationalResponse" all'interno del JSON. Qualsiasi altra risposta sarà considerata un errore.
+
+Inizia la conversazione (attraverso il campo 'conversationalResponse' nel primo JSON) salutando e chiedendo di iniziare. Mantieni un tono professionale e di supporto. Quando l'utente inizia, crea immediatamente la struttura vuota del report con le 6 sezioni e attendi i dettagli.`;
+
 
 // The schema is now for documentation, the model will follow the instruction in the prompt.
 const reportSchema = {
