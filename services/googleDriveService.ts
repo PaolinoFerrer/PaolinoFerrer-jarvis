@@ -1,15 +1,10 @@
-// FIX: Add declarations for gapi and google to resolve TypeScript errors
-// about them not being defined. These are loaded from external scripts.
+
 declare const gapi: any;
-// FIX: Replaced 'declare const google: any' with a proper namespace declaration
-// to allow TypeScript to resolve types like 'google.accounts.oauth2.TokenClient'
-// and functions like 'google.accounts.oauth2.initTokenClient'.
 declare namespace google {
     namespace accounts {
         namespace oauth2 {
             type TokenClient = any;
             type TokenResponse = any;
-
             function initTokenClient(config: any): TokenClient;
             function revoke(token: string, callback: () => void): void;
         }
@@ -38,104 +33,78 @@ const FILE_EXTENSION = '.jarvis.report.json';
 
 let tokenClient: google.accounts.oauth2.TokenClient | null = null;
 let driveFolderId: string | null = null;
+let initPromise: Promise<void> | null = null;
 
-// Promise-based initialization state to prevent race conditions
-let resolveReady: () => void;
-let rejectReady: (reason?: any) => void;
-const readyPromise = new Promise<void>((resolve, reject) => {
-    resolveReady = resolve;
-    rejectReady = reject;
-});
-
-let gapiInited = false;
-let gisInited = false;
-
-function checkReady() {
-    if (gapiInited && gisInited) {
-        resolveReady();
+const loadScript = (src: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
     }
-}
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = (err) => reject(new Error(`Failed to load script ${src}: ${JSON.stringify(err)}`));
+    document.head.appendChild(script);
+  });
+};
 
-/**
- * Funzione di callback chiamata al caricamento dello script GAPI.
- */
-function gapiLoaded() {
-  gapi.load('client', initializeGapiClient);
-}
-
-/**
- * Inizializza il client GAPI.
- */
-async function initializeGapiClient() {
-  try {
-    await gapi.client.init({
-      apiKey: getApiKey(),
-      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-    });
-    gapiInited = true;
-    checkReady();
-  } catch(e) {
-    console.error("Failed to initialize Google API Client", e);
-    rejectReady(new Error("Impossibile inizializzare il client API di Google."));
+const initialize = (): Promise<void> => {
+  if (initPromise) {
+    return initPromise;
   }
-}
 
-/**
- * Funzione di callback chiamata al caricamento dello script GIS.
- */
-function gisLoaded() {
-  try {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: getClientId(),
-      scope: SCOPES,
-      callback: '', // Il callback viene gestito dalla promise nella funzione signIn
-    });
-    gisInited = true;
-    checkReady();
-  } catch(e) {
-    console.error("Failed to initialize Google Identity Services", e);
-    rejectReady(new Error("Impossibile inizializzare i servizi di identità Google."));
-  }
-}
+  initPromise = (async () => {
+    try {
+      await loadScript('https://apis.google.com/js/api.js');
+      await loadScript('https://accounts.google.com/gsi/client');
 
-// FIX: Make callbacks globally available for the onload attributes in index.html
-(window as any).gapiLoaded = gapiLoaded;
-(window as any).gisLoaded = gisLoaded;
+      await new Promise<void>((resolve) => gapi.load('client', resolve));
 
+      await gapi.client.init({
+        apiKey: getApiKey(),
+        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+      });
 
-/**
- * Esegue il login dell'utente e ottiene il token di accesso.
- */
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: getClientId(),
+        scope: SCOPES,
+        callback: '',
+      });
+    } catch (err) {
+      console.error('Google API initialization failed:', err);
+      initPromise = null; // Reset promise on failure to allow retry
+      throw new Error('Impossibile inizializzare i servizi di Google. Controlla la tua connessione e le estensioni del browser (es. ad-blocker).');
+    }
+  })();
+
+  return initPromise;
+};
+
 export async function signIn(): Promise<void> {
-    await readyPromise;
-    if (!tokenClient) {
-        throw new Error('Il client di autenticazione Google non è pronto.');
-    }
+  await initialize();
+  if (!tokenClient) {
+    throw new Error('Il client di autenticazione Google non è pronto.');
+  }
 
-    return new Promise((resolve, reject) => {
-        const callback = (resp: google.accounts.oauth2.TokenResponse) => {
-            if (resp.error) {
-                console.error('Google Sign-In Error:', resp);
-                const errorMessage = `Accesso fallito. Dettagli: ${resp.error_description || resp.error}`;
-                return reject(new Error(errorMessage));
-            }
-            gapi.client.setToken({ access_token: resp.access_token });
-            resolve();
-        };
-        
-        tokenClient.callback = callback;
-
-        // Lascia che GIS gestisca il prompt (consenso, accesso silenzioso, ecc.)
-        tokenClient.requestAccessToken({ prompt: '' });
-    });
+  return new Promise((resolve, reject) => {
+    const callback = (resp: google.accounts.oauth2.TokenResponse) => {
+      if (resp.error) {
+        console.error('Google Sign-In Error:', resp);
+        const errorMessage = `Accesso fallito. Dettagli: ${resp.error_description || resp.error}`;
+        return reject(new Error(errorMessage));
+      }
+      gapi.client.setToken({ access_token: resp.access_token });
+      resolve();
+    };
+    tokenClient.callback = callback;
+    tokenClient.requestAccessToken({ prompt: '' });
+  });
 }
 
-
-/**
- * Esegue il logout dell'utente.
- */
 export async function signOut() {
-  await readyPromise;
+  await initialize();
   const token = gapi.client.getToken();
   if (token !== null) {
     google.accounts.oauth2.revoke(token.access_token, () => {
@@ -144,9 +113,6 @@ export async function signOut() {
   }
 }
 
-/**
- * Cerca la cartella dell'app o la crea se non esiste.
- */
 async function getOrCreateFolderId(): Promise<string> {
   if (driveFolderId) return driveFolderId;
 
@@ -160,13 +126,11 @@ async function getOrCreateFolderId(): Promise<string> {
     return driveFolderId;
   }
 
-  const folderMetadata = {
-    name: FOLDER_NAME,
-    mimeType: 'application/vnd.google-apps.folder',
-  };
-
   const file = await gapi.client.drive.files.create({
-    resource: folderMetadata,
+    resource: {
+      name: FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder',
+    },
     fields: 'id',
   });
 
@@ -174,54 +138,42 @@ async function getOrCreateFolderId(): Promise<string> {
   return driveFolderId;
 }
 
-/**
- * Salva un report su Google Drive. Può creare un nuovo file o aggiornarne uno esistente.
- */
-export async function saveFile(report: Report, fileName: string, fileId: string | null): Promise<{id: string, name: string}> {
-  await readyPromise;
+export async function saveFile(report: Report, fileName: string, fileId: string | null): Promise<{ id: string; name: string }> {
+  await initialize();
   if (!fileName.endsWith(FILE_EXTENSION)) {
-      fileName += FILE_EXTENSION;
+    fileName += FILE_EXTENSION;
   }
-  
+
   const folderId = await getOrCreateFolderId();
   const fileMetadata = {
     name: fileName,
     mimeType: 'application/json',
-    ...(fileId ? {} : { parents: [folderId] }), // Aggiungi il genitore solo se è un nuovo file
+    ...(fileId ? {} : { parents: [folderId] }),
   };
-  
+
   const media = {
     mimeType: 'application/json',
     body: JSON.stringify(report, null, 2),
   };
 
-  let response;
-  if (fileId) {
-    // Aggiorna file esistente
-    response = await gapi.client.drive.files.update({
-      fileId: fileId,
-      resource: fileMetadata,
-      media: media,
-      fields: 'id, name',
-    });
-  } else {
-    // Crea nuovo file
-    response = await gapi.client.drive.files.create({
-      resource: fileMetadata,
-      media: media,
-      fields: 'id, name',
-    });
-  }
-  
+  const response = fileId
+    ? await gapi.client.drive.files.update({
+        fileId: fileId,
+        resource: fileMetadata,
+        media: media,
+        fields: 'id, name',
+      })
+    : await gapi.client.drive.files.create({
+        resource: fileMetadata,
+        media: media,
+        fields: 'id, name',
+      });
+
   return response.result;
 }
 
-
-/**
- * Elenca tutti i file di report salvati.
- */
 export async function listFiles(): Promise<{ id: string; name: string }[]> {
-  await readyPromise;
+  await initialize();
   const folderId = await getOrCreateFolderId();
   const response = await gapi.client.drive.files.list({
     q: `'${folderId}' in parents and name contains '${FILE_EXTENSION}' and trashed=false`,
@@ -232,11 +184,8 @@ export async function listFiles(): Promise<{ id: string; name: string }[]> {
   return response.result.files?.map(f => ({ id: f.id!, name: f.name!.replace(FILE_EXTENSION, '') })) || [];
 }
 
-/**
- * Carica il contenuto di un file di report.
- */
 export async function loadFile(fileId: string): Promise<Report> {
-  await readyPromise;
+  await initialize();
   const response = await gapi.client.drive.files.get({
     fileId: fileId,
     alt: 'media',
@@ -244,12 +193,9 @@ export async function loadFile(fileId: string): Promise<Report> {
   return JSON.parse(response.body);
 }
 
-/**
- * Elimina un file di report.
- */
 export async function deleteFile(fileId: string): Promise<void> {
-    await readyPromise;
-    await gapi.client.drive.files.delete({
-        fileId: fileId,
-    });
+  await initialize();
+  await gapi.client.drive.files.delete({
+    fileId: fileId,
+  });
 }
