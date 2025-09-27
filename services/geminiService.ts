@@ -27,7 +27,7 @@ Le tue responsabilità sono:
     -   Per "Area di lavoro", "Mansione" e "Attrezzature", crea dei "rilievi" dettagliati.
     -   Per "DPI", "Formazione" e "Sorveglianza", elenca i requisiti obbligatori che deduci dall'analisi.
 
-3.  **Usare la Ricerca Web**: Per normative specifiche, recenti o tecniche (es. Accordi Stato-Regioni, norme UNI/CEI, normative antincendio), DEVI utilizzare la ricerca web per fornire le informazioni più aggiornate e precise.
+3.  **Usare la Ricerca Web**: Per normative specifiche, recenti o tecniche (es. Accordi Stato-Regioni, norme UNI/CEI, normative antincendio), DEVI utilizzare la ricerca web per fornire le informazioni più aggiornate e precise, dando priorità a fonti istituzionali (es. gazzettaufficiale.it, ispettorato.gov.it, inail.it).
 
 4.  **Rispondere in JSON**: La tua risposta DEVE SEMPRE contenere un blocco di codice JSON valido, marcato con \`\`\`json ... \`\`\`. Questo blocco JSON è l'unica cosa che devi restituire.
 
@@ -41,6 +41,8 @@ Le tue responsabilità sono:
     -   \`regulation\`: La normativa di riferimento (es. "D.Lgs. 81/08, Titolo III"). Se usi la ricerca, cita la fonte.
     -   \`recommendation\`: Un'azione correttiva o un dettaglio sul requisito.
     -   \`photoAnalysis\`: Se viene fornita un'immagine, descrivi brevemente ciò che è rilevante per il rischio.
+
+7.  **Flusso di Lavoro**: Prima analizzi la richiesta. Poi, se necessario, usi la ricerca web. Infine, DEVI usare TUTTE le informazioni raccolte (input utente e fonti web) per generare il report JSON completo come descritto sopra. La tua risposta finale è SOLO e SEMPRE il blocco JSON.
 
 Inizia la conversazione salutando e chiedendo di iniziare. Mantieni un tono professionale e di supporto. Quando l'utente inizia, crea immediatamente la struttura vuota del report con le 6 sezioni e attendi i dettagli.`;
 
@@ -126,7 +128,7 @@ export async function sendChatMessage(
     }
     parts.push({ text: message });
 
-    // FIX: The `sendMessage` method expects a `SendMessageParameters` object where the `message` property contains the array of parts.
+    // FIX: The sendMessage method expects an object with a 'message' property containing the parts array.
     const response: GenerateContentResponse = await chat.sendMessage({ message: parts });
     
     try {
