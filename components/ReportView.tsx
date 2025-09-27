@@ -2,8 +2,17 @@ import React from 'react';
 import { Report } from '../types.ts';
 import { DownloadIcon } from './icons.tsx';
 
+const SaveIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+    </svg>
+);
+
+
 interface ReportViewProps {
   report: Report;
+  onSave: () => void;
+  isLoggedIn: boolean;
 }
 
 const getRiskColor = (level: number) => {
@@ -12,7 +21,7 @@ const getRiskColor = (level: number) => {
   return 'bg-green-500/20 text-green-400 border-green-500/50';
 };
 
-const ReportView: React.FC<ReportViewProps> = ({ report }) => {
+const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) => {
 
   const handleExport = () => {
     let content = `Documento di Valutazione del Rischio - ${new Date().toLocaleString('it-IT')}\n\n`;
@@ -49,18 +58,32 @@ const ReportView: React.FC<ReportViewProps> = ({ report }) => {
     URL.revokeObjectURL(url);
   };
 
+  const isReportEmpty = report.length === 0 || report.every(s => s.findings.length === 0);
+  const isSaveDisabled = isReportEmpty || !isLoggedIn;
+
   return (
     <div className="bg-jarvis-surface rounded-lg p-6 flex flex-col h-full overflow-y-auto">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-jarvis-primary">Report in Tempo Reale</h2>
-        <button 
-          onClick={handleExport}
-          disabled={report.length === 0}
-          className="flex items-center gap-2 bg-jarvis-primary/20 text-jarvis-primary px-4 py-2 rounded-lg hover:bg-jarvis-primary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <DownloadIcon className="w-5 h-5" />
-          Esporta
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={onSave}
+            disabled={isSaveDisabled}
+            title={!isLoggedIn ? "Accedi con Google per salvare" : "Salva su Google Drive"}
+            className="flex items-center gap-2 bg-jarvis-primary/20 text-jarvis-primary px-4 py-2 rounded-lg hover:bg-jarvis-primary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <SaveIcon className="w-5 h-5" />
+            Salva su Drive
+          </button>
+          <button 
+            onClick={handleExport}
+            disabled={isReportEmpty}
+            className="flex items-center gap-2 bg-jarvis-primary/20 text-jarvis-primary px-4 py-2 rounded-lg hover:bg-jarvis-primary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <DownloadIcon className="w-5 h-5" />
+            Esporta
+          </button>
+        </div>
       </div>
       <div className="space-y-8">
         {report.length === 0 ? (

@@ -42,3 +42,37 @@ export const BrainCircuitIcon: React.FC<{ className?: string }> = ({ className }
     <path d="M4.22 4.22l1.42 1.42"/>
   </svg>
 );
+
+export const ArchiveIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M3 3h18v4H3V3zm0 5h18v13H3V8zm5 3v2h8v-2H8z"/>
+    </svg>
+);
+
+export const TrashIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+    </svg>
+);
+
+export const PlusIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+    </svg>
+);
+
+export const GoogleIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#4285F4" d="M24 9.5c3.23 0 5.45.98 7.2 2.6l5.5-5.5C33.07 3.47 29.04 2 24 2 14.5 2 6.53 7.85 3.53 16.37l6.63 5.12C11.53 14.38 17.2 9.5 24 9.5z"></path>
+        <path fill="#34A853" d="M46.47 24.5c0-1.72-.15-3.37-.43-4.95H24v9.3h12.6c-.55 3-2.15 5.5-4.58 7.2l6.5 5C43.07 36.85 46.47 31.2 46.47 24.5z"></path>
+        <path fill="#FBBC05" d="M10.16 21.48c-.5-1.5-.5-3.15 0-4.65l-6.63-5.12C1.65 14.85 0 19.25 0 24s1.65 9.15 3.53 12.28l6.63-5.12c-.5-1.5-.5-3.15 0-4.68z"></path>
+        <path fill="#EA4335" d="M24 46c5.96 0 10.9-2.3 14.5-6.2l-6.5-5c-2.07 1.4-4.7 2.2-7.9 2.2-6.8 0-12.47-4.88-13.84-11.48l-6.63 5.12C6.53 40.15 14.5 46 24 46z"></path>
+        <path fill="none" d="M0 0h48v48H0z"></path>
+    </svg>
+);
+
+export const LogoutIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+    </svg>
+);

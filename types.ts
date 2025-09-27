@@ -1,15 +1,17 @@
+// FIX: Define and export all necessary types to resolve circular dependency and missing export errors.
+export interface FindingPhoto {
+  analysis: string;
+  base64?: string;
+}
 
 export interface Finding {
   id: string;
   description: string;
   hazard: string;
-  riskLevel: number; // 1-10
+  riskLevel: number;
   regulation: string;
   recommendation: string;
-  photo?: {
-    base64: string;
-    analysis: string;
-  };
+  photo?: FindingPhoto;
 }
 
 export interface ReportSection {
@@ -19,9 +21,26 @@ export interface ReportSection {
 
 export type Report = ReportSection[];
 
+export interface SavedReport {
+  id: string; // timestamp
+  name: string;
+  savedAt: string; // ISO date string
+  report: Report;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model' | 'system';
   text: string;
-  photo?: string; // base64 url
+  photo?: string; // data URL for image
+}
+
+export interface DriveFile {
+  id: string;
+  name: string;
+}
+
+export interface ReportMetadata {
+  driveId: string | null;
+  name: string | null;
 }
