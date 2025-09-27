@@ -29,22 +29,23 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
       content += `========================================\n`;
       content += `SEZIONE: ${section.title.toUpperCase()}\n`;
       content += `========================================\n\n`;
-      if (section.findings.length === 0) {
+      if (!section.findings || section.findings.length === 0) {
         content += `Nessun rilievo in questa sezione.\n\n`;
+      } else {
+        section.findings.forEach((finding, index) => {
+          content += `RILIEVO #${index + 1}\n`;
+          content += `----------------------------------------\n`;
+          content += `Descrizione: ${finding.description}\n`;
+          content += `Pericolo Identificato: ${finding.hazard}\n`;
+          content += `Livello di Rischio: ${finding.riskLevel}/10\n`;
+          content += `Normativa di Riferimento: ${finding.regulation}\n`;
+          content += `Azione Correttiva Raccomandata: ${finding.recommendation}\n`;
+          if (finding.photo && finding.photo.analysis) {
+            content += `Analisi Foto: ${finding.photo.analysis}\n`;
+          }
+          content += `\n`;
+        });
       }
-      section.findings.forEach((finding, index) => {
-        content += `RILIEVO #${index + 1}\n`;
-        content += `----------------------------------------\n`;
-        content += `Descrizione: ${finding.description}\n`;
-        content += `Pericolo Identificato: ${finding.hazard}\n`;
-        content += `Livello di Rischio: ${finding.riskLevel}/10\n`;
-        content += `Normativa di Riferimento: ${finding.regulation}\n`;
-        content += `Azione Correttiva Raccomandata: ${finding.recommendation}\n`;
-        if (finding.photo) {
-          content += `Analisi Foto: ${finding.photo.analysis}\n`;
-        }
-        content += `\n`;
-      });
     });
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -52,13 +53,18 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
     const link = document.createElement('a');
     link.href = url;
     link.download = `report-sicurezza-jarvis-${Date.now()}.txt`;
+    
+    // FIX: More robust download trigger for all browsers/devices
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    
+    setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, 100);
   };
 
-  const isReportEmpty = report.length === 0 || report.every(s => s.findings.length === 0);
+  const isReportEmpty = report.length === 0 || report.every(s => !s.findings || s.findings.length === 0);
   const isSaveDisabled = isReportEmpty || !isLoggedIn;
 
   return (
@@ -95,7 +101,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
           report.map((section, sectionIndex) => (
             <div key={sectionIndex}>
               <h3 className="text-xl font-semibold border-b-2 border-jarvis-primary/30 pb-2 mb-4 text-jarvis-secondary">{section.title}</h3>
-              {section.findings.length === 0 ? (
+              {(!section.findings || section.findings.length === 0) ? (
                 <p className="text-jarvis-text-secondary italic">Nessun rilievo per questa sezione.</p>
               ) : (
                 <div className="space-y-4">
