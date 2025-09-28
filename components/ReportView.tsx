@@ -1,7 +1,8 @@
 import React from 'react';
-import { Report, Workplace, Task } from '../types.ts';
-import { DownloadIcon, SaveIcon } from './icons.tsx';
-import ImprovementPlan from './ImprovementPlan.tsx';
+// Fix: Removed file extensions from imports.
+import { Report, Workplace, Task } from '../types';
+import { DownloadIcon, SaveIcon } from './icons';
+import ImprovementPlan from './ImprovementPlan';
 
 interface ReportViewProps {
   report: Report;

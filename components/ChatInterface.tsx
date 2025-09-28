@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatMessage } from '../types.ts';
-import { useVoiceRecognition } from '../hooks/useVoiceRecognition.ts';
-import { MicrophoneIcon, PaperclipIcon, SendIcon, BrainCircuitIcon, StopIcon } from './icons.tsx';
+// Fix: Removed file extensions from imports.
+import { ChatMessage } from '../types';
+import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
+import { MicrophoneIcon, PaperclipIcon, SendIcon, BrainCircuitIcon, StopIcon } from './icons';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
