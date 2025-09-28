@@ -16,14 +16,17 @@ const getRiskColor = (level: number) => {
   return 'bg-green-500/20 text-green-400 border-green-500/50';
 };
 
-const RiskBadge: React.FC<{ finding: Finding }> = ({ finding }) => (
-    <div className={`text-sm rounded-full border text-center ${getRiskColor(finding.riskLevel)}`}>
-        <p className="font-bold px-3 py-1">Rischio: {finding.riskLevel}/10</p>
-        <p className="text-xs border-t border-current opacity-50 px-3 py-0.5">
-            D:{finding.damage} &middot; P:{finding.probability} &middot; E:{finding.exposure}
-        </p>
-    </div>
-);
+const RiskBadge: React.FC<{ finding: Finding }> = ({ finding }) => {
+    const rawRisk = finding.damage * finding.probability * finding.exposure;
+    return (
+        <div className={`text-sm rounded-lg border text-center ${getRiskColor(finding.riskLevel)}`}>
+            <p className="font-bold px-3 py-1">Rischio: {finding.riskLevel}/10</p>
+            <p className="text-xs border-t border-current opacity-70 px-3 py-0.5" title={`Valore grezzo del rischio: ${rawRisk}`}>
+                D:{finding.damage} &times; P:{finding.probability} &times; E:{finding.exposure} = {rawRisk}
+            </p>
+        </div>
+    );
+};
 
 const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) => {
 
@@ -46,10 +49,11 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
              content += `  - Nessun rilievo specifico per questa mansione.\n\n`;
           } else {
             task.findings.forEach((finding, findIndex) => {
+              const rawRisk = finding.damage * finding.probability * finding.exposure;
               content += `  Rilievo #${findIndex + 1}:\n`;
               content += `    Descrizione: ${finding.description}\n`;
               content += `    Pericolo: ${finding.hazard}\n`;
-              content += `    Rischio Calcolato: ${finding.riskLevel}/10 (D: ${finding.damage}, P: ${finding.probability}, E: ${finding.exposure})\n`;
+              content += `    Rischio Calcolato: ${finding.riskLevel}/10 (Calcolo: D:${finding.damage} x P:${finding.probability} x E:${finding.exposure} = ${rawRisk})\n`;
               content += `    Normativa: ${finding.regulation}\n`;
               content += `    Raccomandazione: ${finding.recommendation}\n\n`;
             });
