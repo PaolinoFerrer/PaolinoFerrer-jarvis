@@ -19,8 +19,8 @@ const getRiskColor = (level: number) => {
 const calculateRawRisk = (finding: Finding): number => {
     const d = finding.damage > 0 ? finding.damage : 1;
     const p = finding.probability > 0 ? finding.probability : 1;
-    const e = finding.exposure > 0 ? finding.exposure : 1;
-    return (d * d) * p * e;
+    const f = finding.exposure > 0 ? finding.exposure : 1; // 'f' for Frequenza
+    return (d * d) * p * f;
 };
 
 const MethodologyExplanation: React.FC = () => {
@@ -43,15 +43,17 @@ const MethodologyExplanation: React.FC = () => {
             <button 
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex justify-between items-center p-3 bg-jarvis-bg/30 hover:bg-jarvis-bg/50 rounded-t-lg"
+                aria-expanded={isOpen}
+                aria-controls="methodology-content"
             >
                 <h3 className="font-semibold text-jarvis-text-secondary">Metodologia di Valutazione del Rischio</h3>
                  <svg className={`w-5 h-5 text-jarvis-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
             {isOpen && (
-                <div className="p-4 text-sm bg-jarvis-bg/20 rounded-b-lg">
+                <div id="methodology-content" className="p-4 text-sm bg-jarvis-bg/20 rounded-b-lg">
                     <p className="mb-3 text-jarvis-text-secondary">Il livello di rischio viene calcolato con una formula che dà un peso esponenziale alla gravità del danno potenziale.</p>
                     <div className="text-center font-mono tracking-wider bg-jarvis-bg p-2 rounded-md mb-4">
-                        Rischio Grezzo (R) = Danno² &times; Probabilità &times; Frequenza
+                        Rischio Grezzo (R) = Danno² &times; Probabilità &times; Frequenza di Esposizione
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -83,20 +85,6 @@ const MethodologyExplanation: React.FC = () => {
     );
 };
 
-
-const RiskBadge: React.FC<{ finding: Finding }> = ({ finding }) => {
-    const rawRisk = calculateRawRisk(finding);
-    const title = `Danno: ${finding.damage}, Probabilità: ${finding.probability}, Frequenza: ${finding.exposure} => Calcolo: ${finding.damage}² × ${finding.probability} × ${finding.exposure} = ${rawRisk}`;
-    return (
-        <div className={`text-sm rounded-lg border text-center ${getRiskColor(finding.riskLevel)}`}>
-            <p className="font-bold px-3 py-1">Rischio: {finding.riskLevel}/10</p>
-            <p className="text-xs border-t border-current opacity-70 px-3 py-0.5 font-mono" title={title}>
-                D{finding.damage}² &times; P{finding.probability} &times; F{finding.exposure} = {rawRisk}
-            </p>
-        </div>
-    );
-};
-
 const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) => {
 
   const handleExport = () => {
@@ -105,8 +93,8 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
     content += `========================================\n`;
     content += `METODOLOGIA DI VALUTAZIONE\n`;
     content += `========================================\n`;
-    content += `Formula: Rischio Grezzo = Danno^2 * Probabilità * Frequenza\n`;
-    content += `Fasce: BASSO (R <= 15), MEDIO (15 < R <= 70), ALTO (R > 70)\n\n`;
+    content += `Formula: Rischio Grezzo = Danno^2 * Probabilità * Frequenza di Esposizione\n`;
+    content += `Fasce: BASSO (Rischio <= 15), MEDIO (15 < Rischio <= 70), ALTO (Rischio > 70)\n\n`;
     
     report.forEach(workplace => {
       content += `========================================\n`;
@@ -127,9 +115,9 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
             task.findings.forEach((finding, findIndex) => {
               const rawRisk = calculateRawRisk(finding);
               content += `  Rilievo #${findIndex + 1}:\n`;
-              content += `    Descrizione: ${finding.description}\n`;
               content += `    Pericolo: ${finding.hazard}\n`;
-              content += `    Rischio Calcolato: ${finding.riskLevel}/10 (Calcolo: Danno ${finding.damage}² × Probabilità ${finding.probability} × Frequenza ${finding.exposure} = ${rawRisk})\n`;
+              content += `    Descrizione: ${finding.description}\n`;
+              content += `    Valutazione Rischio: ${finding.riskLevel}/10 (Calcolo: Danno ${finding.damage}² × Probabilità ${finding.probability} × Frequenza di Esposizione ${finding.exposure} = ${rawRisk})\n`;
               content += `    Normativa: ${finding.regulation}\n`;
               content += `    Raccomandazione: ${finding.recommendation}\n\n`;
             });
@@ -257,17 +245,26 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
                               <h4 className="text-lg font-semibold text-jarvis-primary mb-3">{task.name}</h4>
                               
                               <div className="space-y-4">
-                                {task.findings.map((finding) => (
-                                  <div key={finding.id} className="bg-jarvis-bg/50 rounded-lg p-3">
-                                    <div className={`font-bold mb-2 flex justify-between items-start gap-4 border-b border-jarvis-text/10 pb-2`}>
-                                        <p className="flex-1 pt-1">{finding.hazard}</p>
-                                        <RiskBadge finding={finding} />
-                                    </div>
-                                    <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Descrizione:</strong> {finding.description}</p>
-                                    <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Normativa:</strong> {finding.regulation}</p>
-                                    <p className="text-sm text-jarvis-text-secondary"><strong className="text-jarvis-text">Raccomandazione:</strong> {finding.recommendation}</p>
-                                  </div>
-                                ))}
+                                {task.findings.map((finding) => {
+                                   const rawRisk = calculateRawRisk(finding);
+                                   const tooltipText = `Danno: ${finding.damage}, Probabilità: ${finding.probability}, Frequenza: ${finding.exposure}`;
+                                   return (
+                                      <div key={finding.id} className="bg-jarvis-bg/50 rounded-lg p-3">
+                                        <div className={`font-bold mb-2 flex justify-between items-start gap-4 border-b border-jarvis-text/10 pb-2`}>
+                                            <p className="flex-1 pt-1">{finding.hazard}</p>
+                                            <div className={`text-sm rounded-lg border text-center ${getRiskColor(finding.riskLevel)}`}>
+                                                <p className="font-bold px-3 py-1">Rischio: {finding.riskLevel}/10</p>
+                                                <p className="text-xs border-t border-current opacity-70 px-3 py-0.5 font-mono" title={tooltipText}>
+                                                    D{finding.damage}² &times; P{finding.probability} &times; F{finding.exposure} = {rawRisk}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Descrizione:</strong> {finding.description}</p>
+                                        <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Normativa:</strong> {finding.regulation}</p>
+                                        <p className="text-sm text-jarvis-text-secondary"><strong className="text-jarvis-text">Raccomandazione:</strong> {finding.recommendation}</p>
+                                      </div>
+                                   );
+                                })}
                               </div>
 
                               {task.requiredDpi && task.requiredDpi.length > 0 && (
