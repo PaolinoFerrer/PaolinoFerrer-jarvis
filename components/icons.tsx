@@ -6,10 +6,10 @@ type IconProps = React.SVGProps<SVGSVGElement>;
 export const LogoIcon: React.FC<IconProps> = (props) => (
   <svg width="24" height="24" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
     <path d="M50 2.5C23.76 2.5 2.5 23.76 2.5 50S23.76 97.5 50 97.5 97.5 76.24 97.5 50 76.24 2.5 50 2.5Z" fill="#1A2027"/>
-    <path d="M50 12.5C29.3 12.5 12.5 29.3 12.5 50S29.3 87.5 50 87.5 87.5 70.7 87.5 50 70.7 12.5 50 12.5Z" stroke="#38BDF8" stroke-width="5"/>
-    <path d="M35 50a15 15 0 0115-15" stroke="#00AAFF" stroke-width="5" stroke-linecap="round"/>
-    <path d="M50 65a15 15 0 010-30" stroke="#00AAFF" stroke-width="5" stroke-linecap="round"/>
-    <path d="M65 50a15 15 0 01-15 15" stroke="#00AAFF" stroke-width="5" stroke-linecap="round"/>
+    <path d="M50 12.5C29.3 12.5 12.5 29.3 12.5 50S29.3 87.5 50 87.5 87.5 70.7 87.5 50 70.7 12.5 50 12.5Z" stroke="#38BDF8" strokeWidth="5"/>
+    <path d="M35 50a15 15 0 0115-15" stroke="#00AAFF" strokeWidth="5" strokeLinecap="round"/>
+    <path d="M50 65a15 15 0 010-30" stroke="#00AAFF" strokeWidth="5" strokeLinecap="round"/>
+    <path d="M65 50a15 15 0 01-15 15" stroke="#00AAFF" strokeWidth="5" strokeLinecap="round"/>
     <circle cx="50" cy="50" r="5" fill="#38BDF8"/>
   </svg>
 );

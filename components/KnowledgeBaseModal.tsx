@@ -1,8 +1,6 @@
-// Fix: This file was empty. Implemented the KnowledgeBaseModal component.
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { KnowledgeSource } from '../types';
-import * as backendService from '../services/backendService';
-import { findWebSources } from '../services/geminiService';
+import * as apiClient from '../services/apiClient';
 import {
   TrashIcon,
   SpinnerIcon,
@@ -46,7 +44,7 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
     setIsLoading(true);
     setError(null);
     try {
-      const fetchedSources = await backendService.listKnowledgeSources();
+      const fetchedSources = await apiClient.listKnowledgeSources();
       setSources(fetchedSources);
     } catch (e) {
       setError("Impossibile caricare le fonti di conoscenza.");
@@ -59,15 +57,16 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
   useEffect(() => {
     if (isOpen) {
       fetchSources();
-      const interval = setInterval(fetchSources, 5000);
-      return () => clearInterval(interval);
+      // Optional: Polling to see source status updates
+      // const interval = setInterval(fetchSources, 5000); 
+      // return () => clearInterval(interval);
     }
   }, [isOpen, fetchSources]);
 
   const handleDelete = async (sourceId: string) => {
     if (window.confirm('Sei sicuro di voler eliminare questa fonte di conoscenza?')) {
       try {
-        await backendService.deleteKnowledgeSource(sourceId);
+        await apiClient.deleteKnowledgeSource(sourceId);
         setSources(prev => prev.filter(s => s.id !== sourceId));
       } catch (e) {
         alert("Errore durante l'eliminazione.");
@@ -85,7 +84,7 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
           return;
       }
       try {
-          await backendService.addWebKnowledgeSource(finalUrl, finalTitle);
+          await apiClient.addWebKnowledgeSource(finalUrl, finalTitle);
           setNewWebUrl('');
           setNewWebTitle('');
           setSearchResults(prev => prev.filter(r => r.uri !== finalUrl));
@@ -108,7 +107,7 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
           return;
       }
        try {
-          await backendService.addFileKnowledgeSource(newFile);
+          await apiClient.addFileKnowledgeSource(newFile);
           setNewFile(null);
           if (fileInputRef.current) fileInputRef.current.value = "";
           fetchSources(); // Refresh list
@@ -123,7 +122,7 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
     setIsSearching(true);
     setSearchResults([]);
     try {
-        const results = await findWebSources(searchTopic);
+        const results = await apiClient.findWebSources(searchTopic);
         setSearchResults(results);
     } catch (e) {
         alert("Errore durante la ricerca delle fonti.");

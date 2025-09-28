@@ -1,16 +1,11 @@
-// Fix: This file was empty, which caused a "not a module" error. 
-// Implemented the main App component to structure the application and manage state.
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChatMessage, Report, User, DriveFile } from './types';
+import { ChatMessage, Report, User, DriveFile, KnowledgeSource } from './types';
 import ChatInterface from './components/ChatInterface';
 import ReportView from './components/ReportView';
 import UserMenu from './components/UserMenu';
 import ArchiveModal from './components/ArchiveModal';
 import KnowledgeBaseModal from './components/KnowledgeBaseModal';
-
-import * as authService from './services/authService';
-import * as driveService from './services/googleDriveService';
-import { generateResponse } from './services/geminiService';
+import * as apiClient from './services/apiClient';
 import { LogoIcon } from './components/icons';
 
 
@@ -36,25 +31,37 @@ const App: React.FC = () => {
     
     // Knowledge Base state
     const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
+    const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
 
     // --- Effects ---
 
     useEffect(() => {
         // Initialize user auth
-        const allUsers = authService.getMockUsers();
+        const allUsers = apiClient.getMockUsers();
         setUsers(allUsers);
-        const user = authService.getCurrentUser();
+        const user = apiClient.getCurrentUser();
         if (user) {
             setCurrentUser(user);
         } else if (allUsers.length > 0) {
-            // Log in the first user by default if nobody is logged in
-            const defaultUser = authService.login(allUsers[0].id);
+            const defaultUser = apiClient.login(allUsers[0].id);
             setCurrentUser(defaultUser);
         }
 
         // Initialize Google Drive auth
-        setIsLoggedInToDrive(driveService.isSignedIn());
+        setIsLoggedInToDrive(apiClient.isDriveSignedIn());
     }, []);
+    
+    // Effect to fetch knowledge base when modal is opened by an admin
+    useEffect(() => {
+        const fetchKb = async () => {
+            if (isKnowledgeBaseOpen && currentUser?.role === 'admin') {
+                const sources = await apiClient.listKnowledgeSources();
+                setKnowledgeSources(sources);
+            }
+        };
+        fetchKb();
+    }, [isKnowledgeBaseOpen, currentUser]);
+
 
     // --- Handlers ---
     const handleSendMessage = useCallback(async (text: string, file?: File) => {
@@ -68,7 +75,7 @@ const App: React.FC = () => {
         setMessages(prev => [...prev, userMessage]);
         setIsLoading(true);
 
-        const geminiResult = await generateResponse(report, text, file);
+        const geminiResult = await apiClient.generateResponse(report, text, file);
 
         const modelMessage: ChatMessage = {
             id: `model-${Date.now()}`,
@@ -84,14 +91,9 @@ const App: React.FC = () => {
     }, [report, currentUser]);
 
     const handleLoginDrive = async () => {
-        await driveService.signIn();
+        await apiClient.signInToDrive();
         setIsLoggedInToDrive(true);
         handleOpenArchive();
-    };
-
-    const handleLogoutDrive = async () => {
-        await driveService.signOut();
-        setIsLoggedInToDrive(false);
     };
 
     const handleSaveReport = useCallback(async () => {
@@ -100,7 +102,7 @@ const App: React.FC = () => {
             return;
         }
         try {
-            const savedFile = await driveService.saveReport(report);
+            const savedFile = await apiClient.saveReport(report);
             alert(`Report salvato con successo come "${savedFile.name}"`);
             await handleRefreshArchive();
         } catch (error) {
@@ -111,7 +113,7 @@ const App: React.FC = () => {
 
     const handleRefreshArchive = useCallback(async () => {
         try {
-            const files = await driveService.listReports();
+            const files = await apiClient.listReports();
             setDriveFiles(files);
         } catch (error) {
             console.error("Failed to list reports:", error);
@@ -135,7 +137,7 @@ const App: React.FC = () => {
             return;
         }
         try {
-            const loadedReport = await driveService.loadReport(file.id);
+            const loadedReport = await apiClient.loadReport(file.id);
             setReport(loadedReport);
             setMessages([
                  {
@@ -153,7 +155,7 @@ const App: React.FC = () => {
 
     const handleDeleteReport = useCallback(async (fileId: string) => {
         try {
-            await driveService.deleteReport(fileId);
+            await apiClient.deleteReport(fileId);
             alert("Report eliminato con successo.");
             await handleRefreshArchive();
         } catch (error) {
@@ -163,16 +165,16 @@ const App: React.FC = () => {
     }, [handleRefreshArchive]);
 
     const handleSwitchUser = (userId: string) => {
-        const user = authService.login(userId);
+        const user = apiClient.login(userId);
         setCurrentUser(user);
     };
 
     const handleLogout = () => {
-        authService.logout();
+        apiClient.logout();
         setCurrentUser(null);
-        const allUsers = authService.getMockUsers();
+        const allUsers = apiClient.getMockUsers();
          if (allUsers.length > 0) {
-            setCurrentUser(authService.login(allUsers[0].id));
+            setCurrentUser(apiClient.login(allUsers[0].id));
          }
     };
 
