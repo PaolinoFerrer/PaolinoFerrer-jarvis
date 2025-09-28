@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 // Fix: Removed file extensions from imports.
 import { Report, Workplace, Task, Finding } from '../types';
 import { DownloadIcon, SaveIcon } from './icons';
@@ -16,13 +16,81 @@ const getRiskColor = (level: number) => {
   return 'bg-green-500/20 text-green-400 border-green-500/50';
 };
 
+const calculateRawRisk = (finding: Finding): number => {
+    const d = finding.damage > 0 ? finding.damage : 1;
+    const p = finding.probability > 0 ? finding.probability : 1;
+    const e = finding.exposure > 0 ? finding.exposure : 1;
+    return (d * d) * p * e;
+};
+
+const MethodologyExplanation: React.FC = () => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    const factors = [
+        { name: 'Danno (D)', description: 'Gravità del potenziale infortunio', scale: ['1: Lieve', '2: Medio', '3: Grave', '4: Gravissimo'] },
+        { name: 'Probabilità (P)', description: 'Probabilità che l\'evento accada', scale: ['1: Improbabile', '2: Poco Probabile', '3: Probabile', '4: Molto Probabile'] },
+        { name: 'Esposizione (E)', description: 'Frequenza di esposizione al pericolo', scale: ['1: Rara', '2: Occasionale', '3: Frequente', '4: Continua'] },
+    ];
+    
+    const riskTiers = [
+        { name: 'BASSO (1-4)', range: 'R ≤ 15', color: 'text-green-400' },
+        { name: 'MEDIO (5-7)', range: '15 < R ≤ 70', color: 'text-yellow-400' },
+        { name: 'ALTO (8-10)', range: 'R > 70', color: 'text-red-400' },
+    ];
+
+    return (
+        <div className="mb-4 border border-jarvis-text/10 rounded-lg">
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex justify-between items-center p-3 bg-jarvis-bg/30 hover:bg-jarvis-bg/50 rounded-t-lg"
+            >
+                <h3 className="font-semibold text-jarvis-text-secondary">Metodologia di Valutazione del Rischio</h3>
+                 <svg className={`w-5 h-5 text-jarvis-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+            {isOpen && (
+                <div className="p-4 text-sm bg-jarvis-bg/20 rounded-b-lg">
+                    <p className="mb-3 text-jarvis-text-secondary">Il livello di rischio viene calcolato con una formula che dà un peso esponenziale alla gravità del danno potenziale.</p>
+                    <div className="text-center font-mono tracking-wider bg-jarvis-bg p-2 rounded-md mb-4">
+                        Rischio Grezzo (R) = Danno² &times; Probabilità &times; Esposizione
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        {factors.map(factor => (
+                            <div key={factor.name}>
+                                <p className="font-bold text-jarvis-text">{factor.name}</p>
+                                <p className="text-xs text-jarvis-text-secondary mb-1">{factor.description}</p>
+                                <ul className="text-xs text-jarvis-text-secondary space-y-0.5">
+                                    {factor.scale.map(item => <li key={item}>{item}</li>)}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div>
+                         <p className="font-bold text-jarvis-text mb-1">Fasce di Rischio</p>
+                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                            {riskTiers.map(tier => (
+                                <p key={tier.name} className={tier.color}>
+                                    <strong className="font-semibold">{tier.name}:</strong>
+                                    <span className="font-mono ml-1">{tier.range}</span>
+                                </p>
+                            ))}
+                         </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 const RiskBadge: React.FC<{ finding: Finding }> = ({ finding }) => {
-    const rawRisk = finding.damage * finding.probability * finding.exposure;
+    const rawRisk = calculateRawRisk(finding);
     return (
         <div className={`text-sm rounded-lg border text-center ${getRiskColor(finding.riskLevel)}`}>
             <p className="font-bold px-3 py-1">Rischio: {finding.riskLevel}/10</p>
-            <p className="text-xs border-t border-current opacity-70 px-3 py-0.5" title={`Valore grezzo del rischio: ${rawRisk}`}>
-                D:{finding.damage} &times; P:{finding.probability} &times; E:{finding.exposure} = {rawRisk}
+            <p className="text-xs border-t border-current opacity-70 px-3 py-0.5 font-mono" title={`Valore grezzo del rischio: ${rawRisk}`}>
+                D:{finding.damage}²&times;P:{finding.probability}&times;E:{finding.exposure}={rawRisk}
             </p>
         </div>
     );
@@ -32,6 +100,13 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
 
   const handleExport = () => {
     let content = `Documento di Valutazione del Rischio - ${new Date().toLocaleString('it-IT')}\n\n`;
+    
+    content += `========================================\n`;
+    content += `METODOLOGIA DI VALUTAZIONE\n`;
+    content += `========================================\n`;
+    content += `Formula: Rischio Grezzo = Danno^2 * Probabilità * Esposizione\n`;
+    content += `Fasce: BASSO (R <= 15), MEDIO (15 < R <= 70), ALTO (R > 70)\n\n`;
+    
     report.forEach(workplace => {
       content += `========================================\n`;
       content += `LUOGO DI LAVORO: ${workplace.name.toUpperCase()}\n`;
@@ -49,11 +124,11 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
              content += `  - Nessun rilievo specifico per questa mansione.\n\n`;
           } else {
             task.findings.forEach((finding, findIndex) => {
-              const rawRisk = finding.damage * finding.probability * finding.exposure;
+              const rawRisk = calculateRawRisk(finding);
               content += `  Rilievo #${findIndex + 1}:\n`;
               content += `    Descrizione: ${finding.description}\n`;
               content += `    Pericolo: ${finding.hazard}\n`;
-              content += `    Rischio Calcolato: ${finding.riskLevel}/10 (Calcolo: D:${finding.damage} x P:${finding.probability} x E:${finding.exposure} = ${rawRisk})\n`;
+              content += `    Rischio Calcolato: ${finding.riskLevel}/10 (Calcolo: D:${finding.damage}^2 x P:${finding.probability} x E:${finding.exposure} = ${rawRisk})\n`;
               content += `    Normativa: ${finding.regulation}\n`;
               content += `    Raccomandazione: ${finding.recommendation}\n\n`;
             });
@@ -165,6 +240,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
             </div>
           ) : (
             <>
+              <MethodologyExplanation />
               <div className="space-y-8">
                 {report.map((workplace) => (
                   <div key={workplace.id}>

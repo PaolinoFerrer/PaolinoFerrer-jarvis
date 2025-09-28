@@ -1,4 +1,3 @@
-// Fix: This file was empty. Implemented the geminiService to handle interactions with the @google/genai API.
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { Report, KnowledgeSource, Finding } from '../types';
 
@@ -92,74 +91,50 @@ const reportSchema = {
     required: ["workplaces"]
 };
 
-const systemInstruction = `You are Jarvis, an AI assistant specializing in workplace safety assessment in Italy, conforming to D.Lgs. 81/08. Your primary function is to help a safety technician identify and document risks.
+const systemInstruction = `Sei Jarvis, un assistente IA specializzato nella valutazione della sicurezza sul lavoro in Italia (D.Lgs. 81/08). Il tuo obiettivo è aiutare un tecnico a redigere un Documento di Valutazione dei Rischi (DVR).
 
-When a user describes a hazard, your task is to evaluate three factors based on the scales below and return their numeric values in the JSON. DO NOT invent a final risk score.
+**COMPITO PRINCIPALE: ANALISI PROATTIVA DEI RISCHI**
+Quando un utente descrive una situazione, un luogo o una mansione, il tuo compito non è solo registrare i pericoli menzionati, ma **identificare in modo proattivo tutti i rischi plausibili e immaginabili associati a quel contesto**. Per ogni rischio che identifichi, devi creare un "finding" separato nel report.
 
-RISK CALCULATION FACTORS:
-Your response for each finding MUST include integer values (1-4) for "damage", "probability", and "exposure".
+**VALUTAZIONE QUANTITATIVA DEI FATTORI DI RISCHIO**
+Per ogni "finding", devi valutare tre fattori basandoti sulle scale sottostanti e restituire i loro valori numerici nel JSON. NON inventare un punteggio di rischio finale; il calcolo avverrà esternamente.
 
-1.  **Danno (damage) - Severity of potential harm:**
-    *   1 (Lieve): Minor injury, quick recovery (e.g., scratch).
-    *   2 (Medio): Injury requiring medical attention.
-    *   3 (Grave): Serious injury with partial permanent disability.
-    *   4 (Gravissimo): Fatal or total disability injury.
+1.  **Danno (damage) - Gravità del potenziale infortunio:**
+    *   1 (Lieve): Infortunio leggero, guaribile in pochi giorni (es. graffio).
+    *   2 (Medio): Infortunio con prognosi e necessità di cure mediche.
+    *   3 (Grave): Infortunio serio con invalidità permanente parziale.
+    *   4 (Gravissimo): Infortunio mortale o con invalidità totale.
 
-2.  **Probabilità (probability) - Likelihood of occurrence:**
-    *   1 (Improbabile): Almost impossible.
-    *   2 (Poco Probabile): Could happen, but unlikely.
-    *   3 (Probabile): Foreseeable during the work lifecycle.
-    *   4 (Molto Probabile): Almost certain to happen.
+2.  **Probabilità (probability) - Probabilità che l'evento accada:**
+    *   1 (Improbabile): Evento quasi impossibile da verificarsi.
+    *   2 (Poco Probabile): Potrebbe accadere, ma solo in circostanze sfortunate.
+    *   3 (Probabile): È prevedibile che accada durante il ciclo di vita lavorativo.
+    *   4 (Molto Probabile): È quasi certo che accada.
 
-3.  **Esposizione (exposure) - Frequency of exposure to the hazard:**
-    *   1 (Rara): Less than once a month.
-    *   2 (Occasionale): Weekly exposure.
-    *   3 (Frequente): Daily exposure.
-    *   4 (Continua): Constant exposure during the shift.
+3.  **Esposizione (exposure) - Frequenza di esposizione al pericolo:**
+    *   1 (Rara): L'esposizione al rischio avviene meno di una volta al mese.
+    *   2 (Occasionale): L'esposizione avviene settimanalmente.
+    *   3 (Frequente): L'esposizione avviene quotidianamente.
+    *   4 (Continua): L'esposizione è costante durante il turno di lavoro.
 
-You may be provided with a 'Knowledge Base Context' section. You MUST prioritize this context when answering.
+**FORMATO DELLA RISPOSTA**
+Puoi ricevere un contesto dalla 'Base di Conoscenza'. DEVI dare priorità a questo contesto.
+La tua risposta DEVE SEMPRE essere un oggetto JSON con TRE chiavi: "reportUpdate", "chatResponse", and "citations".
 
-You MUST ALWAYS respond with a JSON object that contains THREE keys: "reportUpdate", "chatResponse", and "citations".
+1.  "reportUpdate": Un oggetto conforme allo schema JSON fornito, contenente tutti i rilievi (findings) che hai identificato.
+2.  "chatResponse": Una stringa di risposta conversazionale in italiano, concisa e professionale.
+3.  "citations": Un array di 'id' dei documenti usati dalla 'Base di Conoscenza'. Se nessuno, array vuoto.
 
-1.  "reportUpdate": An object structured according to the provided JSON schema. For each finding, you must provide the 'damage', 'probability', and 'exposure' values.
-2.  "chatResponse": A concise, friendly, and professional string in Italian. This is your conversational reply.
-3.  "citations": An array of 'id's of any documents from the 'Knowledge Base Context' that you used. If none, return an empty array.
+**ESEMPIO DI ANALISI PROATTIVA**
+Utente: "Analizziamo il magazzino dove lavora un carrellista."
+Tua analisi: Identifichi non solo il rischio menzionato ma anche altri.
+- Rischio 1: Pavimentazione sconnessa (menzionato implicitamente o esplicitamente).
+- Rischio 2: Interferenza con personale a piedi nelle corsie.
+- Rischio 3: Scarsa illuminazione in alcune aree.
+- Rischio 4: Stabilità del carico durante il sollevamento.
+Per ognuno di questi 4 rischi, crei un "finding" completo nel JSON.
 
-Example for the user saying: "Nel magazzino il carrellista deve fare attenzione perché la pavimentazione è molto rovinata e ci passano continuamente"
-Your JSON response should be:
-{
-  "reportUpdate": {
-    "workplaces": [
-      {
-        "id": "workplace-1",
-        "name": "Magazzino",
-        "tasks": [
-          {
-            "id": "task-1",
-            "name": "Carrellista",
-            "findings": [
-              {
-                "id": "finding-1",
-                "description": "La pavimentazione del magazzino presenta buche e dislivelli nell'area di transito dei carrelli elevatori.",
-                "hazard": "Rischio di ribaltamento del carrello elevatore",
-                "damage": 3,
-                "probability": 3,
-                "exposure": 4,
-                "regulation": "D.Lgs. 81/08, Allegato IV",
-                "recommendation": "Ripristinare immediatamente la pavimentazione per garantire una superficie liscia e sicura."
-              }
-            ],
-            "requiredDpi": []
-          }
-        ]
-      }
-    ]
-  },
-  "chatResponse": "Rilievo registrato. La pavimentazione sconnessa è un rischio significativo. Data l'esposizione continua, ho assegnato una priorità alta. C'è altro?",
-  "citations": []
-}
-
-If the user asks a general question, use the googleSearch tool to find relevant information, summarize it in the 'chatResponse' and include the sources. Do not update the report in this case unless the query is clearly a finding.
+Se l'utente fa una domanda generale, usa lo strumento googleSearch per trovare informazioni, riassumile in 'chatResponse' e includi le fonti. Non aggiornare il report in questo caso, a meno che la domanda non sia chiaramente un rilievo.
 `;
 
 export interface GeminiResponse {
@@ -174,16 +149,33 @@ interface ParsedGeminiResponse {
     citations?: string[];
 }
 
-// Maps raw risk score (1-64) to a 1-10 scale
+
+// New risk calculation logic gives exponential weight to Damage.
+// Formula: D^2 * P * E
+const calculateRawRisk = (finding: Finding): number => {
+    // Ensure factors are valid numbers, default to 1 if not.
+    const d = finding.damage > 0 ? finding.damage : 1;
+    const p = finding.probability > 0 ? finding.probability : 1;
+    const e = finding.exposure > 0 ? finding.exposure : 1;
+    
+    // Using D^2 gives much higher weight to the severity of the outcome.
+    return (d * d) * p * e;
+};
+
+// Re-calibrated mapping function for the new risk scale (1-256)
 const mapRawRiskToLevel = (rawRisk: number): number => {
-    if (rawRisk > 27) { // High Risk (maps 28-64 to 8-10)
-        return 8 + Math.round(((rawRisk - 28) / (64 - 28)) * 2);
+    // HIGH RISK (ALTO): R > 70. Maps 71-256 to 8-10. Catastrophic potential (D=4) with non-minimal P/E, 
+    // or serious potential (D=3) with high P/E will land here.
+    if (rawRisk > 70) {
+        return 8 + Math.round(((rawRisk - 71) / (256 - 71)) * 2);
     }
-    if (rawRisk > 9) { // Medium Risk (maps 10-27 to 5-7)
-        return 5 + Math.round(((rawRisk - 10) / (27 - 10)) * 2);
+    // MEDIUM RISK (MEDIO): 15 < R <= 70. Maps 16-70 to 5-7. A D=4 event even with P=1, E=1 (raw risk 16)
+    // now correctly falls into Medium risk.
+    if (rawRisk > 15) { 
+        return 5 + Math.round(((rawRisk - 16) / (70 - 16)) * 2);
     }
-    // Low Risk (maps 1-9 to 1-4)
-    return 1 + Math.round(((rawRisk - 1) / (9 - 1)) * 3);
+    // LOW RISK (BASSO): R <= 15. Maps 1-15 to 1-4.
+    return 1 + Math.round(((rawRisk - 1) / (15 - 1)) * 3);
 };
 
 export const generateResponse = async (
@@ -273,20 +265,14 @@ export const generateResponse = async (
         const reportUpdateFromGemini: Report = parsedResponse.reportUpdate?.workplaces ?? currentReport;
         
         // **RISK CALCULATION LOGIC**
-        // Iterate through the report and calculate the riskLevel for each finding
+        // Iterate through the report and calculate the riskLevel for each finding using the new logic
         const calculatedReport = reportUpdateFromGemini.map(workplace => ({
             ...workplace,
             tasks: workplace.tasks.map(task => ({
                 ...task,
                 findings: task.findings.map(finding => {
-                    // Ensure factors are valid numbers, default to 1 if not.
-                    const d = finding.damage > 0 ? finding.damage : 1;
-                    const p = finding.probability > 0 ? finding.probability : 1;
-                    const e = finding.exposure > 0 ? finding.exposure : 1;
-                    
-                    const rawRisk = d * p * e;
+                    const rawRisk = calculateRawRisk(finding);
                     const calculatedLevel = mapRawRiskToLevel(rawRisk);
-                    
                     return { ...finding, riskLevel: calculatedLevel };
                 })
             }))
