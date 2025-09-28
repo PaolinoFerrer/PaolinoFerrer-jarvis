@@ -1,5 +1,5 @@
 {
-  "name": "Jarvis: Assistente per Sopralluoghi di Sicurezza",
+  "name": "Jarvis DVR: Assistente per Sopralluoghi di Sicurezza",
   "description": "Un assistente conversazionale intelligente per i professionisti della sicurezza sul lavoro. Jarvis aiuta a compilare un Documento di Valutazione del Rischio (DVR) in tempo reale durante i sopralluoghi, utilizzando comandi vocali o testo e analizzando le foto caricate.",
   "requestFramePermissions": [
     "microphone"

@@ -5,7 +5,7 @@ import ReportView from './components/ReportView';
 import ArchiveModal from './components/ArchiveModal';
 import KnowledgeBaseModal from './components/KnowledgeBaseModal';
 import { BrainCircuitIcon } from './components/icons';
-import { sendChatMessage, startChat } from './services/geminiService';
+import { sendChatMessage } from './services/geminiService';
 import * as apiClient from './services/apiClient';
 import UserMenu from './components/UserMenu';
 
@@ -31,7 +31,6 @@ function App() {
 
   useEffect(() => {
     // Initialize services and app state on first load
-    startChat();
     const user = apiClient.getCurrentUser();
     if (user) {
       setCurrentUser(user);

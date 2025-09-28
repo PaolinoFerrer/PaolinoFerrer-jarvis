@@ -24,15 +24,20 @@ const getInitialKnowledgeData = (): Record<string, KnowledgeSource> => ({
 const getMockKnowledgeBase = (): Record<string, KnowledgeSource> => {
     try {
         const stored = localStorage.getItem(KNOWLEDGE_BASE_KEY);
-        if (stored) {
-            return JSON.parse(stored);
+        // ONLY initialize if the key has never been set.
+        if (stored === null) {
+            const initialData = getInitialKnowledgeData();
+            localStorage.setItem(KNOWLEDGE_BASE_KEY, JSON.stringify(initialData));
+            return initialData;
         }
+        // Otherwise, trust what's there, even if it's an empty object from the user deleting all sources.
+        return JSON.parse(stored);
+    } catch (error) {
+        console.error("Failed to parse knowledge base from localStorage, resetting to initial data to prevent crash.", error);
+        // Fallback to initial data ONLY if parsing fails, to prevent a crash.
         const initialData = getInitialKnowledgeData();
         localStorage.setItem(KNOWLEDGE_BASE_KEY, JSON.stringify(initialData));
         return initialData;
-    } catch (error) {
-        console.error("Failed to load mock knowledge base from localStorage", error);
-        return getInitialKnowledgeData();
     }
 };
 

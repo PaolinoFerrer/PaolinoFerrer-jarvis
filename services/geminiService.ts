@@ -91,18 +91,6 @@ Il JSON deve avere questa struttura: \`{ "conversationalResponse": "...", "repor
 
 Inizia la conversazione salutando. Dalla seconda interazione, applica questo flusso senza eccezioni.`;
 
-let chat: Chat;
-
-export function startChat() {
-    const currentAi = getAi();
-    chat = currentAi.chats.create({
-        model: 'gemini-2.5-flash',
-        config: {
-            systemInstruction: systemInstruction,
-            tools: [{googleSearch: {}}], 
-        },
-    });
-}
 
 export async function sendChatMessage(
     message: string,
@@ -112,9 +100,15 @@ export async function sendChatMessage(
     report: Report;
     sources?: { uri: string; title: string }[];
 }> {
-    if (!chat) {
-        startChat();
-    }
+    const currentAi = getAi();
+    // Create a new stateless chat session for each message to improve reliability
+    const chat = currentAi.chats.create({
+        model: 'gemini-2.5-flash',
+        config: {
+            systemInstruction: systemInstruction,
+            tools: [{googleSearch: {}}], 
+        },
+    });
     
     let messagePayload: string | Part[];
 
@@ -160,7 +154,11 @@ export async function sendChatMessage(
         }
 
         return parsed;
-    } catch (e) {
+    } catch (e: any) {
+        // Intercept specific API errors to provide a clearer message to the user.
+        if (e instanceof Error && e.message.includes('INTERNAL')) {
+             throw new Error("Si è verificato un errore interno con il servizio AI. Riprova tra poco.");
+        }
         console.error("Failed to parse JSON response from Gemini:", response.text, e);
         throw new Error("La risposta dell'AI non è in un formato JSON valido o la sua struttura è inaspettata.");
     }
