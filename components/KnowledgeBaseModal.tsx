@@ -130,7 +130,9 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
         setSearchResults(results);
     } catch (e) {
         console.error("Error during source search:", e);
-        setSearchError("Si è verificato un errore durante la ricerca. Riprova.");
+        // Display the specific error message from the service layer.
+        const errorMessage = e instanceof Error ? e.message : "Si è verificato un errore durante la ricerca. Riprova.";
+        setSearchError(errorMessage);
     } finally {
         setIsSearching(false);
     }
@@ -166,8 +168,8 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
                         <span>Ricerca in corso...</span>
                     </div>
                 ) : searchError ? (
-                    <div className="flex items-center justify-center h-full text-red-400">
-                        <ExclamationCircleIcon className="w-5 h-5 mr-2" />
+                    <div className="flex items-center justify-center h-full text-red-400 text-center">
+                        <ExclamationCircleIcon className="w-5 h-5 mr-2 flex-shrink-0" />
                         <span>{searchError}</span>
                     </div>
                 ) : searchPerformed && searchResults.length === 0 ? (

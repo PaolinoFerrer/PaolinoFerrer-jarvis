@@ -7,13 +7,13 @@ import { Report, KnowledgeSource, Finding } from '../types';
 const apiKey = process.env.API_KEY;
 
 if (!apiKey) {
-  // In a real app, this should be handled more gracefully, but for this exercise,
-  // we follow the instructions that the key is pre-configured and available.
-  // Using a placeholder for development if the key isn't set, and logging a warning.
-  console.warn("API_KEY not found in environment variables. Using a placeholder. API calls will fail.");
+  // Using a more prominent error message for developers if the key is missing.
+  console.error("ERRORE CRITICO: La variabile d'ambiente API_KEY non è stata impostata. Le chiamate all'API falliranno.");
 }
 
-const ai = new GoogleGenAI({ apiKey: apiKey || "placeholder-api-key" });
+// Initialize without a placeholder. The SDK will receive undefined if the key is not set.
+// API calls will be guarded to prevent errors if the key is missing.
+const ai = new GoogleGenAI({ apiKey: apiKey });
 
 const fileToGenerativePart = async (file: File) => {
   const base64EncodedData = await new Promise<string>((resolve, reject) => {
@@ -192,6 +192,13 @@ export const generateResponse = async (
   file?: File,
   knowledgeContext?: KnowledgeSource[]
 ): Promise<GeminiResponse> => {
+    // Fail fast with a user-friendly message if the API key is not configured.
+    if (!apiKey) {
+        return {
+            reportUpdate: currentReport,
+            chatResponse: "Errore di configurazione: la chiave API per i servizi IA non è stata impostata. Contatta l'amministratore del sistema.",
+        };
+    }
 
     let augmentedPrompt = `Based on the current report state provided below, please process my request.\n\nCurrent Report State:\n${JSON.stringify(currentReport, null, 2)}`;
     
@@ -249,9 +256,17 @@ export const generateResponse = async (
             parsedResponse = JSON.parse(text);
         } catch (e) {
             console.error("Failed to parse Gemini JSON response:", text);
+            // Provide a user-friendly message for specific, known errors like invalid API keys.
+            if (text.includes("API_KEY_INVALID") || text.includes("API key not valid")) {
+                 return {
+                    reportUpdate: currentReport,
+                    chatResponse: "Si è verificato un errore di autenticazione. La chiave API fornita non è valida. Contatta l'amministratore del sistema.",
+                };
+            }
+            // Provide a better generic message for other parsing failures.
             return {
                 reportUpdate: currentReport,
-                chatResponse: text || "Mi scuso, ma non sono riuscito a elaborare correttamente la richiesta. Potresti riformularla?",
+                chatResponse: "Mi scuso, ma ho ricevuto una risposta in un formato imprevisto e non sono riuscito a elaborarla. Potresti riformulare la tua richiesta?",
             };
         }
         
@@ -309,6 +324,14 @@ export const generateResponse = async (
 
     } catch (error) {
         console.error("Error calling Gemini API:", error);
+        const errorString = String(error);
+        // Handle API key errors specifically in the case of a thrown error.
+        if (errorString.includes("API_KEY_INVALID") || errorString.includes("API key not valid")) {
+            return {
+                reportUpdate: currentReport,
+                chatResponse: "Si è verificato un errore di autenticazione. La chiave API fornita non è valida. Contatta l'amministratore del sistema.",
+            };
+        }
         return {
             reportUpdate: currentReport,
             chatResponse: "Si è verificato un errore di connessione con l'IA. Riprova tra poco.",
@@ -317,6 +340,12 @@ export const generateResponse = async (
 };
 
 export const findWebSources = async (topic: string): Promise<{ title: string; uri: string }[]> => {
+    // Fail fast with a user-friendly message if the API key is not configured.
+    if (!apiKey) {
+      console.error("findWebSources chiamato senza API_KEY. L'operazione è stata interrotta.");
+      throw new Error("Errore di configurazione: la chiave API per i servizi IA non è stata impostata.");
+    }
+
     const prompt = `Agisci come un ricercatore esperto di sicurezza sul lavoro in Italia. Il mio obiettivo è trovare fonti online autorevoli e pertinenti (siti istituzionali, normativi, associazioni di categoria, riviste specializzate) sull'argomento "${topic}". Restituisci un elenco di massimo 5 risultati. Per ogni risultato, fornisci un titolo chiaro e l'URL completo. La tua risposta DEVE essere solo ed esclusivamente un oggetto JSON contenente una singola chiave "sources", che è un array di oggetti, ognuno con le chiavi "title" e "uri". Non includere testo aggiuntivo, spiegazioni o saluti.`;
 
     try {
@@ -352,6 +381,10 @@ export const findWebSources = async (topic: string): Promise<{ title: string; ur
 
     } catch (error) {
         console.error("Error finding web sources:", error);
-        throw new Error("Failed to fetch web sources from Gemini API.");
+        const errorString = String(error);
+        if (errorString.includes("API_KEY_INVALID") || errorString.includes("API key not valid")) {
+            throw new Error("La chiave API non è valida o non è stata configurata correttamente.");
+        }
+        throw new Error("Impossibile recuperare le fonti web a causa di un errore.");
     }
 };
