@@ -29,7 +29,10 @@ const getInitialMockData = (): Record<string, MockDriveFile> => ({
                             id: "finding-initial-1",
                             description: "Pavimentazione sconnessa.",
                             hazard: "Rischio di inciampo e ribaltamento muletto",
-                            riskLevel: 6,
+                            damage: 3,
+                            probability: 2,
+                            exposure: 3,
+                            riskLevel: 6, // 3*2*3=18, maps to 6
                             regulation: "D.Lgs. 81/08",
                             recommendation: "Ripristinare la pavimentazione."
                         }],

@@ -1,6 +1,6 @@
 import React from 'react';
 // Fix: Removed file extensions from imports.
-import { Report, Workplace, Task } from '../types';
+import { Report, Workplace, Task, Finding } from '../types';
 import { DownloadIcon, SaveIcon } from './icons';
 import ImprovementPlan from './ImprovementPlan';
 
@@ -15,6 +15,15 @@ const getRiskColor = (level: number) => {
   if (level >= 5) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50';
   return 'bg-green-500/20 text-green-400 border-green-500/50';
 };
+
+const RiskBadge: React.FC<{ finding: Finding }> = ({ finding }) => (
+    <div className={`text-sm rounded-full border text-center ${getRiskColor(finding.riskLevel)}`}>
+        <p className="font-bold px-3 py-1">Rischio: {finding.riskLevel}/10</p>
+        <p className="text-xs border-t border-current opacity-50 px-3 py-0.5">
+            D:{finding.damage} &middot; P:{finding.probability} &middot; E:{finding.exposure}
+        </p>
+    </div>
+);
 
 const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) => {
 
@@ -40,7 +49,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
               content += `  Rilievo #${findIndex + 1}:\n`;
               content += `    Descrizione: ${finding.description}\n`;
               content += `    Pericolo: ${finding.hazard}\n`;
-              content += `    Rischio: ${finding.riskLevel}/10\n`;
+              content += `    Rischio Calcolato: ${finding.riskLevel}/10 (D: ${finding.damage}, P: ${finding.probability}, E: ${finding.exposure})\n`;
               content += `    Normativa: ${finding.regulation}\n`;
               content += `    Raccomandazione: ${finding.recommendation}\n\n`;
             });
@@ -169,11 +178,9 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
                               <div className="space-y-4">
                                 {task.findings.map((finding) => (
                                   <div key={finding.id} className="bg-jarvis-bg/50 rounded-lg p-3">
-                                    <div className={`font-bold mb-2 flex justify-between items-center border-b border-jarvis-text/10 pb-2`}>
-                                        <p>{finding.hazard}</p>
-                                        <span className={`px-3 py-1 text-sm rounded-full border ${getRiskColor(finding.riskLevel)}`}>
-                                          Rischio: {finding.riskLevel}/10
-                                        </span>
+                                    <div className={`font-bold mb-2 flex justify-between items-start gap-4 border-b border-jarvis-text/10 pb-2`}>
+                                        <p className="flex-1 pt-1">{finding.hazard}</p>
+                                        <RiskBadge finding={finding} />
                                     </div>
                                     <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Descrizione:</strong> {finding.description}</p>
                                     <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Normativa:</strong> {finding.regulation}</p>

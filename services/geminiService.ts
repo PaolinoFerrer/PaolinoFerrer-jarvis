@@ -1,6 +1,6 @@
 // Fix: This file was empty. Implemented the geminiService to handle interactions with the @google/genai API.
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
-import { Report, KnowledgeSource } from '../types';
+import { Report, KnowledgeSource, Finding } from '../types';
 
 // The instructions state: The API key must be obtained exclusively from the environment variable process.env.API_KEY
 // I am assuming the build process defines `process.env.API_KEY`.
@@ -59,11 +59,13 @@ const reportSchema = {
                                             id: { type: Type.STRING, description: "Unique identifier for the finding (e.g., 'finding-789')." },
                                             description: { type: Type.STRING, description: "Detailed description of the observation." },
                                             hazard: { type: Type.STRING, description: "The identified hazard." },
-                                            riskLevel: { type: Type.NUMBER, description: "Risk level from 1 (low) to 10 (high)." },
+                                            damage: { type: Type.NUMBER, description: "Severity of Damage (1-4)." },
+                                            probability: { type: Type.NUMBER, description: "Likelihood of Occurrence (1-4)." },
+                                            exposure: { type: Type.NUMBER, description: "Frequency of Exposure (1-4)." },
                                             regulation: { type: Type.STRING, description: "Reference to the relevant safety regulation (e.g., 'D.Lgs. 81/08')." },
                                             recommendation: { type: Type.STRING, description: "Suggested action to mitigate the risk." },
                                         },
-                                        required: ["id", "description", "hazard", "riskLevel", "regulation", "recommendation"]
+                                        required: ["id", "description", "hazard", "damage", "probability", "exposure", "regulation", "recommendation"]
                                     }
                                 },
                                 requiredDpi: {
@@ -92,30 +94,69 @@ const reportSchema = {
 
 const systemInstruction = `You are Jarvis, an AI assistant specializing in workplace safety assessment in Italy, conforming to D.Lgs. 81/08. Your primary function is to help a safety technician identify and document risks.
 
-Before the user's request, you may be provided with a 'Knowledge Base Context' section containing relevant information from trusted documents. You MUST prioritize this context when answering.
+When a user describes a hazard, your task is to evaluate three factors based on the scales below and return their numeric values in the JSON. DO NOT invent a final risk score.
+
+RISK CALCULATION FACTORS:
+Your response for each finding MUST include integer values (1-4) for "damage", "probability", and "exposure".
+
+1.  **Danno (damage) - Severity of potential harm:**
+    *   1 (Lieve): Minor injury, quick recovery (e.g., scratch).
+    *   2 (Medio): Injury requiring medical attention.
+    *   3 (Grave): Serious injury with partial permanent disability.
+    *   4 (Gravissimo): Fatal or total disability injury.
+
+2.  **Probabilità (probability) - Likelihood of occurrence:**
+    *   1 (Improbabile): Almost impossible.
+    *   2 (Poco Probabile): Could happen, but unlikely.
+    *   3 (Probabile): Foreseeable during the work lifecycle.
+    *   4 (Molto Probabile): Almost certain to happen.
+
+3.  **Esposizione (exposure) - Frequency of exposure to the hazard:**
+    *   1 (Rara): Less than once a month.
+    *   2 (Occasionale): Weekly exposure.
+    *   3 (Frequente): Daily exposure.
+    *   4 (Continua): Constant exposure during the shift.
+
+You may be provided with a 'Knowledge Base Context' section. You MUST prioritize this context when answering.
 
 You MUST ALWAYS respond with a JSON object that contains THREE keys: "reportUpdate", "chatResponse", and "citations".
 
-1.  "reportUpdate": An object structured according to the provided JSON schema, representing the *complete, updated state* of the safety report based on the user's latest input. Do not just send a fragment; send the whole report structure. If the input is insufficient for a valid finding, return the existing report. Generate unique IDs for new items.
+1.  "reportUpdate": An object structured according to the provided JSON schema. For each finding, you must provide the 'damage', 'probability', and 'exposure' values.
+2.  "chatResponse": A concise, friendly, and professional string in Italian. This is your conversational reply.
+3.  "citations": An array of 'id's of any documents from the 'Knowledge Base Context' that you used. If none, return an empty array.
 
-2.  "chatResponse": A concise, friendly, and professional string in Italian. This is your conversational reply. Confirm you've processed the input or ask for clarifications.
-
-3.  "citations": An array of strings, containing the 'id's of any documents from the 'Knowledge Base Context' that you used to formulate your response. If you didn't use any context, return an empty array.
-
-Example for the user describing a forklift driver in a warehouse with an uneven floor:
-The user says: "Nel magazzino il carrellista deve fare attenzione perché la pavimentazione è rovinata"
+Example for the user saying: "Nel magazzino il carrellista deve fare attenzione perché la pavimentazione è molto rovinata e ci passano continuamente"
 Your JSON response should be:
 {
-  "reportUpdate": { /* ... report data ... */ },
-  "chatResponse": "Rilievo registrato per il magazzino. La pavimentazione sconnessa è un rischio significativo. C'è altro da aggiungere per la mansione di carrellista o passiamo a un'altra area?",
+  "reportUpdate": {
+    "workplaces": [
+      {
+        "id": "workplace-1",
+        "name": "Magazzino",
+        "tasks": [
+          {
+            "id": "task-1",
+            "name": "Carrellista",
+            "findings": [
+              {
+                "id": "finding-1",
+                "description": "La pavimentazione del magazzino presenta buche e dislivelli nell'area di transito dei carrelli elevatori.",
+                "hazard": "Rischio di ribaltamento del carrello elevatore",
+                "damage": 3,
+                "probability": 3,
+                "exposure": 4,
+                "regulation": "D.Lgs. 81/08, Allegato IV",
+                "recommendation": "Ripristinare immediatamente la pavimentazione per garantire una superficie liscia e sicura."
+              }
+            ],
+            "requiredDpi": []
+          }
+        ]
+      }
+    ]
+  },
+  "chatResponse": "Rilievo registrato. La pavimentazione sconnessa è un rischio significativo. Data l'esposizione continua, ho assegnato una priorità alta. C'è altro?",
   "citations": []
-}
-
-If you use a provided context about flooring regulations from a document with id 'kb-file-123', your response might be:
-{
-  "reportUpdate": { /* ... report data with specific regulation from the document ... */ },
-  "chatResponse": "Rilievo registrato. Come indicato nel D.Lgs. 81/08, la pavimentazione deve essere priva di protuberanze. Ho aggiunto la raccomandazione di ripristino.",
-  "citations": ["kb-file-123"]
 }
 
 If the user asks a general question, use the googleSearch tool to find relevant information, summarize it in the 'chatResponse' and include the sources. Do not update the report in this case unless the query is clearly a finding.
@@ -133,6 +174,17 @@ interface ParsedGeminiResponse {
     citations?: string[];
 }
 
+// Maps raw risk score (1-64) to a 1-10 scale
+const mapRawRiskToLevel = (rawRisk: number): number => {
+    if (rawRisk > 27) { // High Risk (maps 28-64 to 8-10)
+        return 8 + Math.round(((rawRisk - 28) / (64 - 28)) * 2);
+    }
+    if (rawRisk > 9) { // Medium Risk (maps 10-27 to 5-7)
+        return 5 + Math.round(((rawRisk - 10) / (27 - 10)) * 2);
+    }
+    // Low Risk (maps 1-9 to 1-4)
+    return 1 + Math.round(((rawRisk - 1) / (9 - 1)) * 3);
+};
 
 export const generateResponse = async (
   currentReport: Report,
@@ -203,7 +255,28 @@ export const generateResponse = async (
             };
         }
         
-        const reportUpdate: Report = parsedResponse.reportUpdate?.workplaces ?? currentReport;
+        const reportUpdateFromGemini: Report = parsedResponse.reportUpdate?.workplaces ?? currentReport;
+        
+        // **RISK CALCULATION LOGIC**
+        // Iterate through the report and calculate the riskLevel for each finding
+        const calculatedReport = reportUpdateFromGemini.map(workplace => ({
+            ...workplace,
+            tasks: workplace.tasks.map(task => ({
+                ...task,
+                findings: task.findings.map(finding => {
+                    // Ensure factors are valid numbers, default to 1 if not.
+                    const d = finding.damage > 0 ? finding.damage : 1;
+                    const p = finding.probability > 0 ? finding.probability : 1;
+                    const e = finding.exposure > 0 ? finding.exposure : 1;
+                    
+                    const rawRisk = d * p * e;
+                    const calculatedLevel = mapRawRiskToLevel(rawRisk);
+                    
+                    return { ...finding, riskLevel: calculatedLevel };
+                })
+            }))
+        }));
+
 
         // Handle sources from either RAG or Google Search
         let sources: { uri: string; title: string }[] = [];
@@ -229,7 +302,7 @@ export const generateResponse = async (
         }
         
         return {
-            reportUpdate,
+            reportUpdate: calculatedReport,
             chatResponse: parsedResponse.chatResponse || "Ecco l'aggiornamento.",
             sources: sources.length > 0 ? sources : undefined,
         };

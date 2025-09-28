@@ -16,7 +16,10 @@ export interface Finding {
   id: string;
   description: string;
   hazard: string;
-  riskLevel: number;
+  damage: number; // Valore da 1 a 4 per la Magnitudo del Danno
+  probability: number; // Valore da 1 a 4 per la Probabilità di accadimento
+  exposure: number; // Valore da 1 a 4 per la Frequenza di Esposizione
+  riskLevel: number; // Valore calcolato (1-10) da D*P*E
   regulation: string;
   recommendation: string;
   photo?: {
