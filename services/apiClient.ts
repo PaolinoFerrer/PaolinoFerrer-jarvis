@@ -1,37 +1,25 @@
-import { Report, DriveFile, KnowledgeSource, User } from '../types';
-import * as drive from './googleDriveService';
-import * as kb from './jarvisApi';
-import * as auth from './authService';
+// Fix: This file was not a module. It has been implemented as a facade to aggregate various service modules.
+// This resolves the import error in App.tsx and provides a single point of access to client-side services.
 
-// ====================================================================
-// Questo file è il "Centralino" per tutti i dati dell'applicazione.
-// Al momento, parla con i servizi "mock" che usano il localStorage.
-// In futuro, per passare a un backend reale, modificheremo SOLO QUESTO FILE
-// per fargli fare chiamate di rete (fetch) a un server,
-// senza toccare il resto dell'applicazione.
-// ====================================================================
+// Auth exports from './authService'
+export { getMockUsers, login, logout, getCurrentUser } from './authService';
 
+// Google Drive exports from './googleDriveService'
+// Renaming exports to match their usage in App.tsx
+export { 
+    listReports, 
+    loadReport, 
+    saveReport, 
+    deleteReport,
+    signIn as signInToDrive,
+    signOut as signOutFromDrive,
+    isSignedIn as isDriveConnected
+} from './googleDriveService';
 
-// --- Autenticazione Utente App ---
-export const login = auth.login;
-export const logout = auth.logout;
-export const getCurrentUser = auth.getCurrentUser;
-export const getMockUsers = auth.getMockUsers;
-
-
-// --- Autenticazione Google Drive ---
-export const signInToDrive = drive.signIn;
-export const signOutFromDrive = drive.signOut;
-export const isDriveConnected = drive.isSignedIn;
-
-// --- Gestione Report (attualmente su Google Drive mock) ---
-export const listReports = drive.listReports;
-export const loadReport = drive.loadReport;
-export const saveReport = drive.saveReport;
-export const deleteReport = drive.deleteReport;
-
-// --- Gestione Base di Conoscenza (attualmente su localStorage) ---
-export const listKnowledgeSources = kb.listSources;
-export const addWebKnowledgeSource = (uri: string, title: string) => kb.addSource(uri, title);
-export const addFileKnowledgeSource = kb.addFile;
-export const deleteKnowledgeSource = kb.deleteSource;
+// Knowledge Base exports from './backendService'
+export {
+    listKnowledgeSources,
+    addWebKnowledgeSource,
+    addFileKnowledgeSource,
+    deleteKnowledgeSource
+} from './backendService';
