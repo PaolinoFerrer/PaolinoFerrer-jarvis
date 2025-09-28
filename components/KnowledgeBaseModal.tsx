@@ -38,6 +38,8 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
   const [searchTopic, setSearchTopic] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<{title: string, uri: string}[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchPerformed, setSearchPerformed] = useState(false);
 
 
   const fetchSources = useCallback(async () => {
@@ -121,11 +123,14 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
     if (!searchTopic.trim()) return;
     setIsSearching(true);
     setSearchResults([]);
+    setSearchError(null);
+    setSearchPerformed(true);
     try {
         const results = await apiClient.findWebSources(searchTopic);
         setSearchResults(results);
     } catch (e) {
-        alert("Errore durante la ricerca delle fonti.");
+        console.error("Error during source search:", e);
+        setSearchError("Si è verificato un errore durante la ricerca. Riprova.");
     } finally {
         setIsSearching(false);
     }
@@ -154,21 +159,37 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
                     {isSearching ? <SpinnerIcon className="w-5 h-5"/> : <SearchIcon className="w-5 h-5"/>}
                 </button>
             </form>
-            {searchResults.length > 0 && (
-                <div className="space-y-2 pt-2 max-h-40 overflow-y-auto">
-                    {searchResults.map((result, i) => (
-                        <div key={i} className="bg-jarvis-bg/50 p-2 rounded-md flex justify-between items-center gap-2">
-                            <div className="overflow-hidden">
-                                <p className="text-sm font-semibold truncate" title={result.title}>{result.title}</p>
-                                <a href={result.uri} target="_blank" rel="noopener noreferrer" className="text-xs text-jarvis-text-secondary hover:underline truncate block">{result.uri}</a>
+             <div className="pt-2 min-h-[5rem] max-h-40 overflow-y-auto">
+                {isSearching ? (
+                    <div className="flex items-center justify-center h-full text-jarvis-text-secondary">
+                        <SpinnerIcon className="w-5 h-5 mr-2" />
+                        <span>Ricerca in corso...</span>
+                    </div>
+                ) : searchError ? (
+                    <div className="flex items-center justify-center h-full text-red-400">
+                        <ExclamationCircleIcon className="w-5 h-5 mr-2" />
+                        <span>{searchError}</span>
+                    </div>
+                ) : searchPerformed && searchResults.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-jarvis-text-secondary">
+                        <span>Nessun risultato trovato.</span>
+                    </div>
+                ) : searchResults.length > 0 ? (
+                    <div className="space-y-2">
+                        {searchResults.map((result, i) => (
+                            <div key={i} className="bg-jarvis-bg/50 p-2 rounded-md flex justify-between items-center gap-2">
+                                <div className="overflow-hidden">
+                                    <p className="text-sm font-semibold truncate" title={result.title}>{result.title}</p>
+                                    <a href={result.uri} target="_blank" rel="noopener noreferrer" className="text-xs text-jarvis-text-secondary hover:underline truncate block">{result.uri}</a>
+                                </div>
+                                <button onClick={(e) => handleAddWebSource(e, result.uri, result.title)} className="p-1.5 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/30 flex-shrink-0" title="Aggiungi alla conoscenza">
+                                    <PlusIcon className="w-4 h-4"/>
+                                </button>
                             </div>
-                            <button onClick={(e) => handleAddWebSource(e, result.uri, result.title)} className="p-1.5 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/30 flex-shrink-0" title="Aggiungi alla conoscenza">
-                                <PlusIcon className="w-4 h-4"/>
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                ) : null}
+            </div>
           </div>
 
           {/* Manual Add */}

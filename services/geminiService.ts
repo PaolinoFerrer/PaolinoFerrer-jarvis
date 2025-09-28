@@ -254,6 +254,6 @@ export const findWebSources = async (topic: string): Promise<{ title: string; ur
 
     } catch (error) {
         console.error("Error finding web sources:", error);
-        return [];
+        throw new Error("Failed to fetch web sources from Gemini API.");
     }
 };
