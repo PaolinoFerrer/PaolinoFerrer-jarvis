@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-// Fix: Removed file extensions from imports.
-import { Report, Workplace, Task, Finding } from '../types';
-import { DownloadIcon, SaveIcon } from './icons';
+import React from 'react';
+import { Report, Finding } from '../types';
+import { SaveIcon, DownloadIcon } from './icons';
 import ImprovementPlan from './ImprovementPlan';
 
 interface ReportViewProps {
@@ -10,284 +9,195 @@ interface ReportViewProps {
   isLoggedIn: boolean;
 }
 
-const getRiskColor = (level: number) => {
-  if (level >= 8) return 'bg-red-500/20 text-red-400 border-red-500/50';
-  if (level >= 5) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50';
-  return 'bg-green-500/20 text-green-400 border-green-500/50';
+const getRiskColor = (level: number): string => {
+  if (level >= 8) return 'text-red-400 border-red-400';
+  if (level >= 5) return 'text-yellow-400 border-yellow-400';
+  return 'text-green-400 border-green-400';
 };
 
-const calculateRawRisk = (finding: Finding): number => {
-    const d = finding.damage > 0 ? finding.damage : 1;
-    const p = finding.probability > 0 ? finding.probability : 1;
-    const f = finding.exposure > 0 ? finding.exposure : 1; // 'f' for Frequenza
-    return (d * d) * p * f;
-};
-
-const MethodologyExplanation: React.FC = () => {
-    const [isOpen, setIsOpen] = useState(false);
-
-    const factors = [
-        { name: 'Danno (D)', description: 'Gravità del potenziale infortunio', scale: ['1: Lieve', '2: Medio', '3: Grave', '4: Gravissimo'] },
-        { name: 'Probabilità (P)', description: 'Probabilità che l\'evento accada', scale: ['1: Improbabile', '2: Poco Probabile', '3: Probabile', '4: Molto Probabile'] },
-        { name: 'Frequenza di Esposizione (F)', description: 'Frequenza di esposizione al pericolo', scale: ['1: Rara', '2: Occasionale', '3: Frequente', '4: Continua'] },
-    ];
-    
-    const riskTiers = [
-        { name: 'BASSO (1-4)', range: 'R ≤ 15', color: 'text-green-400' },
-        { name: 'MEDIO (5-7)', range: '15 < R ≤ 70', color: 'text-yellow-400' },
-        { name: 'ALTO (8-10)', range: 'R > 70', color: 'text-red-400' },
-    ];
-
-    return (
-        <div className="mb-4 border border-jarvis-text/10 rounded-lg">
-            <button 
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex justify-between items-center p-3 bg-jarvis-bg/30 hover:bg-jarvis-bg/50 rounded-t-lg"
-                aria-expanded={isOpen}
-                aria-controls="methodology-content"
-            >
-                <h3 className="font-semibold text-jarvis-text-secondary">Metodologia di Valutazione del Rischio</h3>
-                 <svg className={`w-5 h-5 text-jarvis-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-            </button>
-            {isOpen && (
-                <div id="methodology-content" className="p-4 text-sm bg-jarvis-bg/20 rounded-b-lg">
-                    <p className="mb-3 text-jarvis-text-secondary">Il livello di rischio viene calcolato con una formula che dà un peso esponenziale alla gravità del danno potenziale.</p>
-                    <div className="text-center font-mono tracking-wider bg-jarvis-bg p-2 rounded-md mb-4">
-                        Rischio Grezzo (R) = Danno² &times; Probabilità &times; Frequenza di Esposizione
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        {factors.map(factor => (
-                            <div key={factor.name}>
-                                <p className="font-bold text-jarvis-text">{factor.name}</p>
-                                <p className="text-xs text-jarvis-text-secondary mb-1">{factor.description}</p>
-                                <ul className="text-xs text-jarvis-text-secondary space-y-0.5">
-                                    {factor.scale.map(item => <li key={item}>{item}</li>)}
-                                </ul>
-                            </div>
-                        ))}
-                    </div>
-                    
-                    <div>
-                         <p className="font-bold text-jarvis-text mb-1">Fasce di Rischio</p>
-                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                            {riskTiers.map(tier => (
-                                <p key={tier.name} className={tier.color}>
-                                    <strong className="font-semibold">{tier.name}:</strong>
-                                    <span className="font-mono ml-1">{tier.range}</span>
-                                </p>
-                            ))}
-                         </div>
-                    </div>
-                </div>
-            )}
+const FindingDetail: React.FC<{ finding: Finding }> = ({ finding }) => (
+    <div className="bg-jarvis-bg/50 p-4 rounded-lg border-l-4 border-jarvis-primary/30">
+        <div className="flex justify-between items-start">
+            <h5 className="font-semibold text-jarvis-text">{finding.hazard}</h5>
+            <div className={`text-sm font-bold px-2 py-1 border rounded-full ${getRiskColor(finding.riskLevel)}`}>
+                Rischio: {finding.riskLevel}/10
+            </div>
         </div>
-    );
-};
+        <p className="text-sm text-jarvis-text-secondary mt-1">{finding.description}</p>
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+            <div className="bg-jarvis-surface/50 p-2 rounded"><strong>Danno:</strong> {finding.damage}/4</div>
+            <div className="bg-jarvis-surface/50 p-2 rounded"><strong>Probabilità:</strong> {finding.probability}/4</div>
+            <div className="bg-jarvis-surface/50 p-2 rounded"><strong>Esposizione:</strong> {finding.exposure}/4</div>
+        </div>
+        <div className="mt-3 text-sm space-y-1">
+            <p><strong className="text-jarvis-text-secondary">Normativa:</strong> {finding.regulation}</p>
+            <p><strong className="text-jarvis-text-secondary">Raccomandazione:</strong> {finding.recommendation}</p>
+        </div>
+    </div>
+);
+
 
 const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) => {
+    
+    // A simplified function to generate a text-based report for download
+    const generateTextReport = (): string => {
+        let content = "Documento di Valutazione dei Rischi (DVR)\n\n";
+        report.forEach(workplace => {
+            content += `========================================\n`;
+            content += `LUOGO DI LAVORO: ${workplace.name}\n`;
+            content += `========================================\n\n`;
+            workplace.tasks.forEach(task => {
+                content += `----------------------------------------\n`;
+                content += `MANSIONE: ${task.name}\n`;
+                content += `----------------------------------------\n\n`;
+                
+                content += `DPI RICHIESTI:\n`;
+                if (task.requiredDpi.length > 0) {
+                    task.requiredDpi.forEach(dpi => {
+                        content += `- ${dpi.name}${dpi.notes ? ` (${dpi.notes})` : ''}\n`;
+                    });
+                } else {
+                    content += `- Nessuno specificato\n`;
+                }
+                content += `\n`;
 
-  const handleExport = () => {
-    let content = `Documento di Valutazione del Rischio - ${new Date().toLocaleString('it-IT')}\n\n`;
-    
-    content += `========================================\n`;
-    content += `METODOLOGIA DI VALUTAZIONE\n`;
-    content += `========================================\n`;
-    content += `Formula: Rischio Grezzo = Danno^2 * Probabilità * Frequenza di Esposizione\n`;
-    content += `Fasce: BASSO (Rischio <= 15), MEDIO (15 < Rischio <= 70), ALTO (Rischio > 70)\n\n`;
-    
-    report.forEach(workplace => {
-      content += `========================================\n`;
-      content += `LUOGO DI LAVORO: ${workplace.name.toUpperCase()}\n`;
-      content += `========================================\n\n`;
-      if (!workplace.tasks || workplace.tasks.length === 0) {
-        content += `Nessuna mansione specificata per questo luogo di lavoro.\n\n`;
-      } else {
-        workplace.tasks.forEach((task) => {
-          content += `  ----------------------------------------\n`;
-          content += `  MANSIONE: ${task.name}\n`;
-          content += `  ----------------------------------------\n\n`;
-          
-          content += `  *** RILIEVI DI RISCHIO ***\n`;
-          if (!task.findings || task.findings.length === 0) {
-             content += `  - Nessun rilievo specifico per questa mansione.\n\n`;
-          } else {
-            task.findings.forEach((finding, findIndex) => {
-              const rawRisk = calculateRawRisk(finding);
-              content += `  Rilievo #${findIndex + 1}:\n`;
-              content += `    Pericolo: ${finding.hazard}\n`;
-              content += `    Descrizione: ${finding.description}\n`;
-              content += `    Valutazione Rischio: ${finding.riskLevel}/10 (Calcolo: Danno ${finding.damage}² × Probabilità ${finding.probability} × Frequenza di Esposizione ${finding.exposure} = ${rawRisk})\n`;
-              content += `    Normativa: ${finding.regulation}\n`;
-              content += `    Raccomandazione: ${finding.recommendation}\n\n`;
+                content += `RILIEVI DI SICUREZZA:\n`;
+                if (task.findings.length > 0) {
+                    task.findings.forEach((finding, index) => {
+                        content += `Rilievo #${index + 1}\n`;
+                        content += `  Pericolo: ${finding.hazard}\n`;
+                        content += `  Descrizione: ${finding.description}\n`;
+                        content += `  Livello Rischio: ${finding.riskLevel}/10 (D:${finding.damage}, P:${finding.probability}, E:${finding.exposure})\n`;
+                        content += `  Normativa: ${finding.regulation}\n`;
+                        content += `  Raccomandazione: ${finding.recommendation}\n\n`;
+                    });
+                } else {
+                     content += `Nessun rilievo per questa mansione.\n\n`;
+                }
             });
-          }
-
-          content += `  *** DISPOSITIVI DI PROTEZIONE INDIVIDUALE (DPI) ***\n`;
-           if (!task.requiredDpi || task.requiredDpi.length === 0) {
-             content += `  - Nessun DPI specifico per questa mansione.\n\n`;
-           } else {
-              task.requiredDpi.forEach(dpi => {
-                content += `  - ${dpi.name}${dpi.notes ? ` (${dpi.notes})` : ''}\n`;
-              });
-              content += `\n`;
-           }
         });
-      }
-    });
 
-    const allFindings = report.flatMap(workplace => 
-        workplace.tasks.flatMap(task => 
-            task.findings.map(finding => ({ ...finding, workplaceName: workplace.name, taskName: task.name }))
-        )
-    );
+        // Add Improvement Plan
+        const allFindings = report.flatMap(w => w.tasks.flatMap(t => t.findings.map(f => ({...f, workplaceName: w.name, taskName: t.name}))));
+        if (allFindings.length > 0) {
+            content += `\n\n========================================\n`;
+            content += `PIANO DI MIGLIORAMENTO\n`;
+            content += `========================================\n\n`;
 
-    if (allFindings.length > 0) {
-        content += `\n\n========================================\n`;
-        content += `APPENDICE: PIANO DI MIGLIORAMENTO\n`;
-        content += `========================================\n\n`;
+            const red = allFindings.filter(f => f.riskLevel >= 8).sort((a,b) => b.riskLevel - a.riskLevel);
+            const yellow = allFindings.filter(f => f.riskLevel >= 5 && f.riskLevel < 8).sort((a,b) => b.riskLevel - a.riskLevel);
+            const green = allFindings.filter(f => f.riskLevel < 5).sort((a,b) => b.riskLevel - a.riskLevel);
 
-        const categorizedFindings = {
-            red: allFindings.filter(f => f.riskLevel >= 8).sort((a,b) => b.riskLevel - a.riskLevel),
-            yellow: allFindings.filter(f => f.riskLevel >= 5 && f.riskLevel < 8).sort((a,b) => b.riskLevel - a.riskLevel),
-            green: allFindings.filter(f => f.riskLevel < 5).sort((a,b) => b.riskLevel - a.riskLevel),
-        };
-
-        if (categorizedFindings.red.length > 0) {
-            content += `*** RISANAMENTO IMMEDIATO (RISCHIO ALTO) ***\n\n`;
-            categorizedFindings.red.forEach(f => {
-                content += `- Pericolo: ${f.hazard} (Rischio: ${f.riskLevel}/10)\n`;
-                content += `  Luogo: ${f.workplaceName} / ${f.taskName}\n`;
-                content += `  Raccomandazione: ${f.recommendation}\n\n`;
-            });
+            if (red.length > 0) {
+                content += `** RISANAMENTO IMMEDIATO (Rischio >= 8) **\n`;
+                red.forEach(f => {
+                    content += `- ${f.hazard} (${f.workplaceName}/${f.taskName}) - Raccomandazione: ${f.recommendation}\n`
+                });
+                content += `\n`;
+            }
+             if (yellow.length > 0) {
+                content += `** RISANAMENTO RAPIDO (Rischio 5-7) **\n`;
+                yellow.forEach(f => {
+                    content += `- ${f.hazard} (${f.workplaceName}/${f.taskName}) - Raccomandazione: ${f.recommendation}\n`
+                });
+                content += `\n`;
+            }
+            if (green.length > 0) {
+                content += `** OBIETTIVO DI MIGLIORAMENTO (Rischio < 5) **\n`;
+                green.forEach(f => {
+                    content += `- ${f.hazard} (${f.workplaceName}/${f.taskName}) - Raccomandazione: ${f.recommendation}\n`
+                });
+                content += `\n`;
+            }
         }
-        if (categorizedFindings.yellow.length > 0) {
-            content += `*** RISANAMENTO RAPIDO (RISCHIO MEDIO) ***\n\n`;
-            categorizedFindings.yellow.forEach(f => {
-                content += `- Pericolo: ${f.hazard} (Rischio: ${f.riskLevel}/10)\n`;
-                content += `  Luogo: ${f.workplaceName} / ${f.taskName}\n`;
-                content += `  Raccomandazione: ${f.recommendation}\n\n`;
-            });
-        }
-        if (categorizedFindings.green.length > 0) {
-            content += `*** OBIETTIVO DI MIGLIORAMENTO (RISCHIO BASSO) ***\n\n`;
-            categorizedFindings.green.forEach(f => {
-                content += `- Pericolo: ${f.hazard} (Rischio: ${f.riskLevel}/10)\n`;
-                content += `  Luogo: ${f.workplaceName} / ${f.taskName}\n`;
-                content += `  Raccomandazione: ${f.recommendation}\n\n`;
-            });
-        }
-    }
 
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `report-sicurezza-jarvis-${Date.now()}.txt`;
-    
-    document.body.appendChild(link);
-    link.click();
-    
-    setTimeout(() => {
-        document.body.removeChild(link);
+        return content;
+    };
+
+    const handleDownload = () => {
+        const textContent = generateTextReport();
+        const blob = new Blob([textContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report-dvr-${new Date().toISOString().split('T')[0]}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }, 100);
-  };
+    };
 
-  const isReportEmpty = report.length === 0 || report.every(w => !w.tasks || w.tasks.length === 0);
-  const isSaveDisabled = isReportEmpty || !isLoggedIn;
-
-  return (
-    <div className="bg-jarvis-surface rounded-lg p-6 flex flex-col h-full">
-      <div className="flex justify-between items-center mb-6 gap-4 flex-shrink-0">
-        <h2 className="text-2xl font-bold text-jarvis-primary">Report in Tempo Reale</h2>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={onSave}
-            disabled={isSaveDisabled}
-            title={!isLoggedIn ? "Accedi con Google per salvare" : "Salva su Google Drive"}
-            className="flex items-center gap-2 bg-jarvis-primary/20 text-jarvis-primary px-4 py-2 rounded-lg hover:bg-jarvis-primary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <SaveIcon className="w-5 h-5" />
-            Salva su Drive
-          </button>
-          <button 
-            onClick={handleExport}
-            disabled={isReportEmpty}
-            className="flex items-center gap-2 bg-jarvis-primary/20 text-jarvis-primary px-4 py-2 rounded-lg hover:bg-jarvis-primary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <DownloadIcon className="w-5 h-5" />
-            Esporta
-          </button>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto -mr-2 pr-2">
-          {isReportEmpty ? (
-            <div className="text-center text-jarvis-text-secondary py-10 h-full flex flex-col justify-center">
-              <p>Il report è vuoto.</p>
-              <p>Inizia la conversazione per aggiungere rilievi.</p>
+    return (
+        <div className="bg-jarvis-surface rounded-lg flex flex-col h-full overflow-hidden">
+            <div className="p-4 border-b border-jarvis-text/10 flex justify-between items-center flex-shrink-0">
+                <h2 className="text-xl font-bold text-jarvis-primary">Documento di Valutazione dei Rischi (DVR)</h2>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleDownload}
+                        disabled={report.length === 0}
+                        className="p-2 rounded-full hover:bg-jarvis-bg disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Scarica report testuale"
+                    >
+                        <DownloadIcon className="w-5 h-5" />
+                    </button>
+                    <button 
+                        onClick={onSave}
+                        disabled={!isLoggedIn || report.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-jarvis-primary text-white rounded-lg hover:bg-jarvis-secondary disabled:bg-jarvis-text-secondary disabled:cursor-not-allowed"
+                        title={!isLoggedIn ? "Accedi a Google Drive per salvare" : "Salva report su Google Drive"}
+                    >
+                        <SaveIcon className="w-5 h-5" />
+                        <span>Salva</span>
+                    </button>
+                </div>
             </div>
-          ) : (
-            <>
-              <MethodologyExplanation />
-              <div className="space-y-8">
-                {report.map((workplace) => (
-                  <div key={workplace.id}>
-                    <h3 className="text-xl font-semibold border-b-2 border-jarvis-primary/30 pb-2 mb-4 text-jarvis-secondary">
-                      Luogo: {workplace.name}
-                    </h3>
-                    {(!workplace.tasks || workplace.tasks.length === 0) ? (
-                      <p className="text-jarvis-text-secondary italic ml-2">Nessuna mansione specificata.</p>
-                    ) : (
-                      <div className="space-y-6 pl-2">
-                        {workplace.tasks.map((task) => (
-                          <div key={task.id} className="bg-jarvis-bg/30 rounded-lg p-4 border border-jarvis-text/10">
-                              <h4 className="text-lg font-semibold text-jarvis-primary mb-3">{task.name}</h4>
-                              
-                              <div className="space-y-4">
-                                {task.findings.map((finding) => {
-                                   const rawRisk = calculateRawRisk(finding);
-                                   const tooltipText = `Danno: ${finding.damage}, Probabilità: ${finding.probability}, Frequenza: ${finding.exposure}`;
-                                   return (
-                                      <div key={finding.id} className="bg-jarvis-bg/50 rounded-lg p-3">
-                                        <div className={`font-bold mb-2 flex justify-between items-start gap-4 border-b border-jarvis-text/10 pb-2`}>
-                                            <p className="flex-1 pt-1">{finding.hazard}</p>
-                                            <div className={`text-sm rounded-lg border text-center ${getRiskColor(finding.riskLevel)}`}>
-                                                <p className="font-bold px-3 py-1">Rischio: {finding.riskLevel}/10</p>
-                                                <p className="text-xs border-t border-current opacity-70 px-3 py-0.5 font-mono" title={tooltipText}>
-                                                    D{finding.damage}² &times; P{finding.probability} &times; F{finding.exposure} = {rawRisk}
-                                                </p>
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+                {report.length === 0 ? (
+                    <div className="text-center text-jarvis-text-secondary h-full flex flex-col justify-center items-center">
+                        <p className="text-lg">Il report è vuoto.</p>
+                        <p>Inizia descrivendo un'area o un rischio nella chat.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-8">
+                        {report.map(workplace => (
+                            <div key={workplace.id}>
+                                <h3 className="text-lg font-bold text-jarvis-text pb-2 mb-4 border-b-2 border-jarvis-primary/50">
+                                    Luogo di Lavoro: {workplace.name}
+                                </h3>
+                                <div className="space-y-6 pl-4">
+                                    {workplace.tasks.map(task => (
+                                        <div key={task.id}>
+                                            <h4 className="text-md font-semibold text-jarvis-text-secondary mb-3">
+                                                Mansione: {task.name}
+                                            </h4>
+                                            
+                                            {task.requiredDpi.length > 0 && (
+                                                <div className="mb-4">
+                                                    <p className="text-sm font-semibold mb-1">DPI Richiesti:</p>
+                                                    <ul className="list-disc list-inside text-sm text-jarvis-text-secondary">
+                                                        {task.requiredDpi.map((dpi, index) => <li key={index}>{dpi.name}{dpi.notes ? ` (${dpi.notes})`: ''}</li>)}
+                                                    </ul>
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-4">
+                                                {task.findings.length > 0 ? (
+                                                    task.findings.map(finding => <FindingDetail key={finding.id} finding={finding} />)
+                                                ) : (
+                                                    <p className="text-sm text-jarvis-text-secondary italic">Nessun rilievo specifico per questa mansione.</p>
+                                                )}
                                             </div>
                                         </div>
-                                        <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Descrizione:</strong> {finding.description}</p>
-                                        <p className="text-sm text-jarvis-text-secondary mb-2"><strong className="text-jarvis-text">Normativa:</strong> {finding.regulation}</p>
-                                        <p className="text-sm text-jarvis-text-secondary"><strong className="text-jarvis-text">Raccomandazione:</strong> {finding.recommendation}</p>
-                                      </div>
-                                   );
-                                })}
-                              </div>
-
-                              {task.requiredDpi && task.requiredDpi.length > 0 && (
-                                  <div className="mt-4 pt-3 border-t border-jarvis-text/10">
-                                      <h5 className="font-semibold text-jarvis-text-secondary mb-2">DPI Obbligatori:</h5>
-                                      <ul className="list-disc list-inside text-sm text-jarvis-text-secondary space-y-1">
-                                          {task.requiredDpi.map((dpi, i) => <li key={i}>{dpi.name}</li>)}
-                                      </ul>
-                                  </div>
-                              )}
-                          </div>
+                                    ))}
+                                </div>
+                            </div>
                         ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <ImprovementPlan report={report} />
-            </>
-          )}
-      </div>
-    </div>
-  );
+                         <ImprovementPlan report={report} />
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 };
 
 export default ReportView;
