@@ -1,41 +1,63 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChatMessage, Report, DriveFile, KnowledgeSource } from './types';
+import { ChatMessage, Report, DriveFile, KnowledgeSource, User } from './types';
 import ChatInterface from './components/ChatInterface';
 import ReportView from './components/ReportView';
 import ArchiveModal from './components/ArchiveModal';
 import KnowledgeBaseModal from './components/KnowledgeBaseModal';
 import { BrainCircuitIcon } from './components/icons';
 import { sendChatMessage, startChat } from './services/geminiService';
-import * as drive from './services/googleDriveService';
-import * as kb from './services/jarvisApi';
+import * as apiClient from './services/apiClient';
+import UserMenu from './components/UserMenu';
 
-// Fix: Replaced placeholder content with a full implementation of the App component.
 function App() {
+  // App State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [report, setReport] = useState<Report>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auth & Drive state
-  const [isLoggedIn, setIsLoggedIn] = useState(drive.isSignedIn());
+  // User Auth State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [mockUsers, setMockUsers] = useState<User[]>([]);
+
+  // Drive State
+  const [isDriveConnected, setIsDriveConnected] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   
-  // Knowledge Base state
+  // Knowledge Base State
   const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSource[]>([]);
 
   useEffect(() => {
+    // Initialize services and app state on first load
     startChat();
+    const user = apiClient.getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+    }
+    setMockUsers(apiClient.getMockUsers());
+    setIsDriveConnected(apiClient.isDriveConnected());
+    
     setMessages([
       {
         id: 'init-1',
         role: 'model',
-        text: 'Ciao! Sono Jarvis, il tuo assistente per la sicurezza sul lavoro. Come posso aiutarti a compilare il Documento di Valutazione dei Rischi oggi? Descrivi una situazione o carica una foto.'
+        text: 'Ciao! Sono Jarvis, il tuo assistente per la sicurezza sul lavoro. Come posso aiutarti oggi?'
       }
     ]);
     loadKnowledgeSources();
   }, []);
+  
+  // --- User Auth Handlers ---
+  const handleLogin = (userId: string) => {
+    const user = apiClient.login(userId);
+    setCurrentUser(user);
+  };
+  const handleLogout = () => {
+    apiClient.logout();
+    setCurrentUser(null);
+  };
 
   const handleSendMessage = async (text: string, file?: File) => {
     setError(null);
@@ -101,31 +123,26 @@ function App() {
       setMessages(prev => [...prev, errorBotMessage]);
     } finally {
       setIsLoading(false);
-      // Photo URL is kept for rendering in the chat message
     }
   };
 
-  // --- Auth Handlers ---
-  const handleLogin = async () => {
-    await drive.signIn();
-    setIsLoggedIn(true);
+  // --- Drive Handlers ---
+  const handleDriveConnect = async () => {
+    await apiClient.signInToDrive();
+    setIsDriveConnected(true);
   };
-  const handleLogout = async () => {
-    await drive.signOut();
-    setIsLoggedIn(false);
-  };
-
-  // --- Google Drive Handlers ---
+ 
+  // --- Report Archive Handlers (using apiClient) ---
   const handleOpenArchive = async () => {
-    if (!isLoggedIn) {
-        alert("Effettua il login con Google per accedere all'archivio.");
+    if (!isDriveConnected) {
+        alert("Connetti a Google Drive per accedere all'archivio.");
         return;
     }
     await loadDriveFiles();
     setIsArchiveOpen(true);
   };
   const loadDriveFiles = async () => {
-    const files = await drive.listReports();
+    const files = await apiClient.listReports();
     setDriveFiles(files);
   };
   const handleSaveReport = async () => {
@@ -134,8 +151,8 @@ function App() {
       return;
     }
     try {
-      await drive.saveReport(report);
-      alert("Report salvato con successo su Google Drive!");
+      await apiClient.saveReport(report);
+      alert("Report salvato con successo!");
       await loadDriveFiles();
     } catch (e: any) {
       alert(`Errore durante il salvataggio del report: ${e.message}`);
@@ -143,12 +160,12 @@ function App() {
   };
   const handleLoadReport = async (file: DriveFile) => {
     try {
-        const loadedReport = await drive.loadReport(file.id);
+        const loadedReport = await apiClient.loadReport(file.id);
         setReport(loadedReport);
         setMessages(prev => [...prev, {
             id: `sys-${Date.now()}`,
             role: 'model',
-            text: `Report "${file.name}" caricato da Google Drive.`
+            text: `Report "${file.name}" caricato.`
         }]);
         setIsArchiveOpen(false);
     } catch (e: any) {
@@ -157,7 +174,7 @@ function App() {
   };
   const handleDeleteReport = async (fileId: string) => {
     try {
-        await drive.deleteReport(fileId);
+        await apiClient.deleteReport(fileId);
         alert("Report eliminato con successo.");
         await loadDriveFiles();
     } catch (e: any) {
@@ -165,24 +182,42 @@ function App() {
     }
   };
 
-  // --- Knowledge Base Handlers ---
+  // --- Knowledge Base Handlers (using apiClient) ---
   const loadKnowledgeSources = useCallback(async () => {
-    const sources = await kb.listSources();
+    const sources = await apiClient.listKnowledgeSources();
     setKnowledgeSources(sources);
   }, []);
   const handleAddWebSource = async (source: { uri: string; title: string }) => {
-    await kb.addSource(source.uri, source.title);
+    await apiClient.addWebKnowledgeSource(source.uri, source.title);
     await loadKnowledgeSources();
   };
   const handleAddFileSource = async (file: File) => {
-    await kb.addFile(file);
+    await apiClient.addFileKnowledgeSource(file);
     await loadKnowledgeSources();
   };
   const handleDeleteSource = async (sourceId: string) => {
-    await kb.deleteSource(sourceId);
+    await apiClient.deleteKnowledgeSource(sourceId);
     await loadKnowledgeSources();
   };
 
+  if (!currentUser) {
+    return (
+        <div className="bg-jarvis-bg min-h-screen flex flex-col items-center justify-center">
+            <div className="bg-jarvis-surface p-8 rounded-lg text-center">
+                <BrainCircuitIcon className="w-16 h-16 text-jarvis-primary mx-auto mb-4" />
+                <h1 className="text-2xl font-bold mb-4">Benvenuto in Jarvis DVR</h1>
+                <p className="text-jarvis-text-secondary mb-6">Seleziona un utente per iniziare</p>
+                <div className="flex flex-col gap-3">
+                    {mockUsers.map(user => (
+                        <button key={user.id} onClick={() => handleLogin(user.id)} className="w-full bg-jarvis-primary/80 hover:bg-jarvis-primary text-white font-bold py-2 px-4 rounded">
+                            {user.name} ({user.role})
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    )
+  }
 
   return (
     <div className="bg-jarvis-bg min-h-screen text-jarvis-text font-sans">
@@ -193,13 +228,14 @@ function App() {
             <h1 className="text-2xl font-bold text-white">Jarvis<span className="text-jarvis-secondary"> DVR</span></h1>
           </div>
           <div className="flex items-center gap-4">
-             <button onClick={() => setIsKnowledgeBaseOpen(true)} className="text-sm text-jarvis-text-secondary hover:text-jarvis-primary transition-colors">Base di Conoscenza</button>
-             <button onClick={handleOpenArchive} className="text-sm text-jarvis-text-secondary hover:text-jarvis-primary transition-colors">Archivio</button>
-             {isLoggedIn ? (
-                <button onClick={handleLogout} className="bg-red-500/20 text-red-400 px-4 py-2 rounded-lg text-sm hover:bg-red-500/30">Logout</button>
-             ) : (
-                <button onClick={handleLogin} className="bg-jarvis-primary/80 text-white px-4 py-2 rounded-lg text-sm hover:bg-jarvis-primary">Login with Google</button>
+             {currentUser.role === 'admin' && (
+                <button onClick={() => setIsKnowledgeBaseOpen(true)} className="text-sm text-jarvis-text-secondary hover:text-jarvis-primary transition-colors">Base di Conoscenza</button>
              )}
+             <button onClick={handleOpenArchive} className="text-sm text-jarvis-text-secondary hover:text-jarvis-primary transition-colors">Archivio</button>
+             {!isDriveConnected && (
+                <button onClick={handleDriveConnect} className="bg-blue-600/80 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-600">Connetti a Drive</button>
+             )}
+             <UserMenu currentUser={currentUser} users={mockUsers} onSwitchUser={handleLogin} onLogout={handleLogout} />
           </div>
         </div>
       </header>
@@ -216,7 +252,7 @@ function App() {
             <ReportView 
                 report={report}
                 onSave={handleSaveReport}
-                isLoggedIn={isLoggedIn}
+                isLoggedIn={isDriveConnected}
             />
         </div>
       </main>
@@ -236,16 +272,17 @@ function App() {
         onRefresh={loadDriveFiles}
       />
       
-      <KnowledgeBaseModal
-        isOpen={isKnowledgeBaseOpen}
-        onClose={() => setIsKnowledgeBaseOpen(false)}
-        sources={knowledgeSources}
-        onDelete={handleDeleteSource}
-        onRefresh={loadKnowledgeSources}
-        onAddWebSource={handleAddWebSource}
-        // Fix: Corrected typo from onAddFileSource to handleAddFileSource to match the defined handler.
-        onAddFile={handleAddFileSource}
-      />
+      {currentUser.role === 'admin' &&
+        <KnowledgeBaseModal
+            isOpen={isKnowledgeBaseOpen}
+            onClose={() => setIsKnowledgeBaseOpen(false)}
+            sources={knowledgeSources}
+            onDelete={handleDeleteSource}
+            onRefresh={loadKnowledgeSources}
+            onAddWebSource={handleAddWebSource}
+            onAddFile={handleAddFileSource}
+        />
+       }
 
     </div>
   );
