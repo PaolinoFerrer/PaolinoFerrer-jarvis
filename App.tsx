@@ -86,11 +86,13 @@ function App() {
 
       const response = await sendChatMessage(text, imagePayload);
       
+      const sourcesForMessage = currentUser?.role === 'admin' ? response.sources : undefined;
+
       const modelMessage: ChatMessage = {
         id: `model-${Date.now()}`,
         role: 'model',
         text: response.conversationalResponse,
-        sources: response.sources
+        sources: sourcesForMessage
       };
       
       setMessages(prev => [...prev, modelMessage]);
