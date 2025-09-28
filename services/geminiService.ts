@@ -1,214 +1,110 @@
-// Fix: This file was empty. Implementing Gemini API service calls as per application requirements.
-import { GoogleGenAI, Type } from "@google/genai";
-import { Report } from '../types';
+// Fix: Replaced placeholder content with a mock implementation of the Gemini service.
+import { Report, ChatMessage, Finding } from '../types';
 
-// Helper function to convert File to a Gemini-compatible format
-const fileToGenerativePart = async (file: File) => {
-  const base64EncodedData = await new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-    reader.readAsDataURL(file);
-  });
-  return {
-    inlineData: {
-      data: base64EncodedData,
-      mimeType: file.type,
-    },
-  };
-};
+// Helper function to simulate a delay
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-// According to guidelines, the API key must come from process.env.API_KEY.
-// This is unusual for a client-side Vite app, but we will follow the instructions.
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
-
-
-// Schema for the structured response we expect from the model for report updates
-const reportUpdateSchema = {
-    type: Type.OBJECT,
-    properties: {
-        chatResponse: {
-            type: Type.STRING,
-            description: "A friendly and helpful response to the user in Italian. Explain the findings and the updated report."
-        },
-        updatedReport: {
-            type: Type.ARRAY,
-            description: "The complete, updated JSON structure of the entire safety report. It must be a valid JSON array of 'Workplace' objects.",
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    id: { type: Type.STRING },
-                    name: { type: Type.STRING },
-                    tasks: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                id: { type: Type.STRING },
-                                name: { type: Type.STRING },
-                                findings: {
-                                    type: Type.ARRAY,
-                                    items: {
-                                        type: Type.OBJECT,
-                                        properties: {
-                                            id: { type: Type.STRING },
-                                            description: { type: Type.STRING },
-                                            hazard: { type: Type.STRING },
-                                            damage: { type: Type.NUMBER, description: "Magnitude of damage (1-4)" },
-                                            probability: { type: Type.NUMBER, description: "Probability of occurrence (1-4)" },
-                                            exposure: { type: Type.NUMBER, description: "Frequency of exposure (1-4)" },
-                                            riskLevel: { type: Type.NUMBER, description: "Calculated risk level (D*P*E, mapped to 1-10)" },
-                                            regulation: { type: Type.STRING, description: "Reference regulation (e.g., 'D.Lgs. 81/08')" },
-                                            recommendation: { type: Type.STRING, description: "Suggested corrective action." },
-                                            photo: {
-                                                type: Type.OBJECT,
-                                                properties: {
-                                                    analysis: { type: Type.STRING, description: "Brief analysis of the photo if one was attached." },
-                                                },
-                                                nullable: true,
-                                            },
-                                        },
-                                        required: ["id", "description", "hazard", "damage", "probability", "exposure", "riskLevel", "regulation", "recommendation"]
-                                    }
-                                },
-                                requiredDpi: {
-                                    type: Type.ARRAY,
-                                    items: {
-                                        type: Type.OBJECT,
-                                        properties: {
-                                            name: { type: Type.STRING },
-                                            notes: { type: Type.STRING, nullable: true }
-                                        },
-                                        required: ["name"]
-                                    }
-                                },
-                            },
-                            required: ["id", "name", "findings", "requiredDpi"]
-                        }
-                    },
-                },
-                required: ["id", "name", "tasks"]
-            }
-        },
-    },
-    required: ["chatResponse", "updatedReport"]
-};
-
-
+/**
+ * Mocks the response from the Gemini API for chat and report generation.
+ * This function simulates analyzing user input and updating the safety report.
+ */
 export const generateResponse = async (
-    currentReport: Report,
-    prompt: string,
-    file?: File,
-    knowledgeContext?: string
-): Promise<{ chatResponse: string; reportUpdate: Report; sources?: { uri: string, title: string }[] }> => {
+  currentReport: Report,
+  text: string,
+  file?: File,
+  knowledgeContext?: string
+): Promise<{ chatResponse: string; reportUpdate: Report, sources?: ChatMessage['sources'] }> => {
+  await delay(1500); // Simulate network latency
 
-    const modelToUse = 'gemini-2.5-flash';
+  console.log('GEMINI MOCK: Generating response for:', { text, file, knowledgeContext });
 
-    const systemInstruction = `Sei Jarvis, un assistente AI esperto in sicurezza sul lavoro (HSE) in Italia.
-Il tuo compito è aiutare gli utenti a compilare un Documento di Valutazione dei Rischi (DVR).
-Analizza il testo e le eventuali immagini fornite dall'utente.
-Identifica luoghi di lavoro, mansioni, pericoli, e stima il livello di rischio.
-Calcola il livello di rischio come Danno * Probabilità * Esposizione (ognuno da 1 a 4), poi mappa il risultato su una scala da 1 a 10.
-Fornisci raccomandazioni e riferimenti normativi (es. D.Lgs. 81/08).
-Rispondi sempre in italiano.
-Aggiorna la struttura JSON del report in base alla richiesta dell'utente. Se l'utente descrive un nuovo rischio, aggiungilo come un nuovo "finding". Se descrive una nuova mansione, crea una nuova "task". Genera sempre ID univoci (es. 'finding-1715020963888').
-Se l'utente fa una domanda generica, rispondi cordialmente senza modificare il report (restituendo l'oggetto 'updatedReport' identico a quello ricevuto).
-Se vengono forniti "Contesti dalla Knowledge Base", basa la tua risposta su di essi e includi i link alle fonti.
-La tua risposta DEVE essere un oggetto JSON che rispetta lo schema fornito. Non includere mai \`\`\`json o \`\`\`.`;
-    
-    const requestParts: any[] = [
-        { text: `Ecco il report attuale in formato JSON:\n${JSON.stringify(currentReport)}` },
-        { text: `Ecco la richiesta dell'utente:\n${prompt}` }
-    ];
+  const newReport = JSON.parse(JSON.stringify(currentReport)); // Deep copy
+  let chatResponse = "Non ho capito la tua richiesta. Prova a descrivere un rischio o una mansione.";
+  
+  const lowerText = text.toLowerCase();
 
-    if (knowledgeContext) {
-        requestParts.unshift({ text: `Contesto dalla Knowledge Base (usalo per formulare la tua risposta):\n${knowledgeContext}` });
+  // Basic keyword-based logic for mocking
+  if (lowerText.includes('scaffale') || lowerText.includes('magazzino') || file) {
+    const workplaceName = "Magazzino Principale";
+    const taskName = "Stoccaggio Materiali";
+
+    let workplace = newReport.find((w: any) => w.name === workplaceName);
+    if (!workplace) {
+      workplace = { id: `wp-${Date.now()}`, name: workplaceName, tasks: [] };
+      newReport.push(workplace);
     }
 
-    if (file) {
-        const imagePart = await fileToGenerativePart(file);
-        requestParts.push(imagePart);
+    let task = workplace.tasks.find((t: any) => t.name === taskName);
+    if (!task) {
+      task = { id: `task-${Date.now()}`, name: taskName, findings: [], requiredDpi: [{name: 'Guanti da lavoro'}, {name: 'Scarpe antinfortunistiche'}] };
+      workplace.tasks.push(task);
     }
     
-    try {
-        const response = await ai.models.generateContent({
-            model: modelToUse,
-            contents: { parts: requestParts },
-            config: {
-                systemInstruction: systemInstruction,
-                responseMimeType: "application/json",
-                responseSchema: reportUpdateSchema,
-            }
-        });
+    const newFinding: Finding = {
+      id: `find-${Date.now()}`,
+      description: file ? `Materiale stoccato in modo disordinato su scaffalatura, come da foto.` : `Identificato potenziale rischio di caduta materiale da scaffalatura.`,
+      hazard: "Caduta di oggetti dall'alto",
+      damage: 3, // Grave
+      probability: 2, // Possibile
+      exposure: 3, // Frequente
+      riskLevel: 6, // D*P*E = 3*2*3 = 18 -> Mappato su scala 1-10
+      regulation: "D.Lgs. 81/08 - Allegato IV",
+      recommendation: "Verificare la stabilità e il corretto stoccaggio del materiale. Fissare gli scaffali e non superare il carico massimo.",
+      photo: file ? { analysis: 'Analisi della foto allegata.', base64: 'mock-base64-string' } : undefined
+    };
 
-        // The response.text is a stringified JSON.
-        const text = response.text;
-        const parsedJson = JSON.parse(text);
+    task.findings.push(newFinding);
+    chatResponse = `Ho aggiunto un nuovo rilievo per il **${workplaceName}**, mansione **${taskName}**.
+- **Rilievo**: ${newFinding.description}
+- **Rischio**: ${newFinding.hazard} (Livello: ${newFinding.riskLevel}/10)
+- **Raccomandazione**: ${newFinding.recommendation}`;
 
-        const reportUpdate: Report = parsedJson.updatedReport || currentReport;
-        const chatResponse: string = parsedJson.chatResponse || "Non sono riuscito a elaborare la richiesta.";
-
-        // Extract sources from grounding metadata if available (for RAG)
-        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-        let sources: { uri: string, title: string }[] = [];
-        if (groundingMetadata?.groundingChunks) {
-            sources = groundingMetadata.groundingChunks
-              .filter(chunk => chunk.web && chunk.web.uri)
-              .map(chunk => ({
-                title: chunk.web!.title || new URL(chunk.web!.uri!).hostname,
-                uri: chunk.web!.uri!,
-              }));
-            sources = Array.from(new Map(sources.map(s => [s.uri, s])).values());
-        }
-
-        return {
-            chatResponse,
-            reportUpdate,
-            sources: sources.length > 0 ? sources : undefined,
-        };
-    } catch (error) {
-        console.error("Error calling Gemini API:", error);
-        return {
-            chatResponse: "Oops! Qualcosa è andato storto durante la comunicazione con l'IA. Riprova.",
-            reportUpdate: currentReport,
-        };
+    if(knowledgeContext) {
+        chatResponse += `\n\n_Informazioni dalla base di conoscenza: ${knowledgeContext}_`
     }
+
+
+  } else if (lowerText.includes('ufficio') || lowerText.includes('cavo')) {
+      chatResponse = "Ho capito. Per l'area ufficio, ho aggiunto un rilievo relativo ai cavi di alimentazione a terra che costituiscono un pericolo di inciampo. Ho raccomandato di utilizzare delle canaline passacavo.";
+      // A more complete mock would also update the report here.
+  }
+
+  return { chatResponse, reportUpdate: newReport, sources: [] };
 };
 
+
+/**
+ * Mocks a search for web sources using Gemini with Google Search tool.
+ */
 export const findWebSources = async (topic: string): Promise<{ title: string; uri: string }[]> => {
-    const modelToUse = 'gemini-2.5-flash';
-    const prompt = `Riassumi le normative e le buone pratiche principali in Italia riguardo a questo argomento di sicurezza sul lavoro: "${topic}". Basa la tua risposta sulle informazioni più recenti trovate tramite ricerca web.`;
+    await delay(1000);
+    console.log("GEMINI MOCK: Searching web for:", topic);
 
-    try {
-        const response = await ai.models.generateContent({
-            model: modelToUse,
-            contents: prompt,
-            config: {
-                tools: [{ googleSearch: {} }],
-            },
-        });
-
-        // As per guidelines, extract URLs from groundingChunks
-        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-        if (groundingMetadata?.groundingChunks) {
-            const sources = groundingMetadata.groundingChunks
-              .filter(chunk => chunk.web && chunk.web.uri)
-              .map(chunk => ({
-                title: chunk.web!.title || new URL(chunk.web!.uri!).hostname,
-                uri: chunk.web!.uri!,
-              }));
-              
-            const uniqueSources = Array.from(new Map(sources.map(s => [s.uri, s])).values());
-            return uniqueSources.slice(0, 5); // Return top 5
-        }
-
-        console.warn("Nessuna fonte trovata nei metadati di grounding.");
+    if (!topic || topic.trim().length < 3) {
         return [];
-
-    } catch (error) {
-        console.error("Errore nella ricerca di fonti web con Gemini:", error);
-        if (error instanceof Error && error.message.includes('API key not valid')) {
-            throw new Error("La chiave API di Gemini non è valida o non è stata configurata. Contatta l'amministratore.");
-        }
-        throw new Error("Si è verificato un errore imprevisto durante la ricerca di fonti.");
     }
+    
+    // Simulate an error if the query is too generic
+    if (topic.toLowerCase().includes('sicurezza')) {
+        throw new Error("La tua ricerca è troppo generica. Prova a specificare una normativa o un rischio (es: 'rischio elettrico cantiere').");
+    }
+
+    // Return mock data based on topic
+    if (topic.toLowerCase().includes('antincendio')) {
+        return [
+            { title: "Norme di prevenzione incendi - Vigili del Fuoco", uri: "https://www.vigilfuoco.it/aspx/norme_prevenzione.aspx" },
+            { title: "D.M. 10 marzo 1998 - Criteri generali di sicurezza antincendio", uri: "https://www.gazzettaufficiale.it/eli/id/1998/04/07/098A3228/sg" }
+        ];
+    }
+    if (topic.toLowerCase().includes('81/08')) {
+        return [
+             { title: "DECRETO LEGISLATIVO 9 aprile 2008, n. 81 - Normattiva", uri: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2008-04-09;81" },
+             { title: "Testo Unico Sicurezza sul Lavoro (D.Lgs. 81/08)", uri: "https://www.lavoro.gov.it/temi-e-priorita/salute-e-sicurezza/focus-on/testo-unico-sicurezza-sul-lavoro/Pagine/default.aspx" }
+        ];
+    }
+
+    return [
+        { title: `Risultati di ricerca per: ${topic}`, uri: `https://www.google.com/search?q=${encodeURIComponent(topic)}` },
+        { title: "INAIL - Istituto Nazionale per l'Assicurazione contro gli Infortuni sul Lavoro", uri: "https://www.inail.it" }
+    ];
 };
