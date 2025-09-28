@@ -118,3 +118,28 @@ export const deleteKnowledgeSource = async (sourceId: string): Promise<void> => 
     }
     throw new Error("Source to delete not found in mock knowledge base.");
 };
+
+
+export const searchKnowledgeBase = async (query: string): Promise<KnowledgeSource[]> => {
+    console.log("BACKEND: Searching knowledge base for:", query);
+    await new Promise(resolve => setTimeout(resolve, 400)); // Simulate search latency
+    
+    if (!query.trim()) {
+        return [];
+    }
+
+    const kb = getMockKnowledgeBase();
+    const allSources = Object.values(kb);
+    const queryTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 2);
+
+    const matchedSources = allSources.filter(source => {
+        if (source.status !== 'ready') return false; // Only search ready sources
+
+        const title = source.title.toLowerCase();
+        // Simple keyword matching: returns true if any query term is found in the title
+        return queryTerms.some(term => title.includes(term));
+    });
+
+    console.log(`BACKEND: Found ${matchedSources.length} matched sources.`);
+    return Promise.resolve(matchedSources);
+};

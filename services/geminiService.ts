@@ -1,6 +1,6 @@
 // Fix: This file was empty. Implemented the geminiService to handle interactions with the @google/genai API.
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
-import { Report } from '../types';
+import { Report, KnowledgeSource } from '../types';
 
 // The instructions state: The API key must be obtained exclusively from the environment variable process.env.API_KEY
 // I am assuming the build process defines `process.env.API_KEY`.
@@ -90,47 +90,32 @@ const reportSchema = {
     required: ["workplaces"]
 };
 
-const systemInstruction = `You are Jarvis, an AI assistant specializing in workplace safety assessment in Italy, conforming to D.Lgs. 81/08.
-Your primary function is to help a safety technician identify and document risks.
-When the user describes a situation, a task, or a workplace, you must analyze it and update a comprehensive safety report.
-You MUST ALWAYS respond with a JSON object that contains two keys: "reportUpdate" and "chatResponse".
+const systemInstruction = `You are Jarvis, an AI assistant specializing in workplace safety assessment in Italy, conforming to D.Lgs. 81/08. Your primary function is to help a safety technician identify and document risks.
 
-1.  "reportUpdate": This key will contain an object structured according to the provided JSON schema. This object should represent the *complete, updated state* of the safety report based on the user's latest input. Do not just send a fragment; send the whole report structure. If the user's input doesn't contain enough information to create a valid finding, return the existing report structure or an empty one if it's the first turn. Generate unique IDs for new items (e.g., 'workplace-168...').
+Before the user's request, you may be provided with a 'Knowledge Base Context' section containing relevant information from trusted documents. You MUST prioritize this context when answering.
 
-2.  "chatResponse": This key will contain a concise, friendly, and professional string in Italian. This is your conversational reply to the user. You should confirm that you've processed their input, ask for clarifications if needed, or prompt them for the next piece of information.
+You MUST ALWAYS respond with a JSON object that contains THREE keys: "reportUpdate", "chatResponse", and "citations".
+
+1.  "reportUpdate": An object structured according to the provided JSON schema, representing the *complete, updated state* of the safety report based on the user's latest input. Do not just send a fragment; send the whole report structure. If the input is insufficient for a valid finding, return the existing report. Generate unique IDs for new items.
+
+2.  "chatResponse": A concise, friendly, and professional string in Italian. This is your conversational reply. Confirm you've processed the input or ask for clarifications.
+
+3.  "citations": An array of strings, containing the 'id's of any documents from the 'Knowledge Base Context' that you used to formulate your response. If you didn't use any context, return an empty array.
 
 Example for the user describing a forklift driver in a warehouse with an uneven floor:
 The user says: "Nel magazzino il carrellista deve fare attenzione perché la pavimentazione è rovinata"
 Your JSON response should be:
 {
-  "reportUpdate": {
-    "workplaces": [
-      {
-        "id": "workplace-1689341829",
-        "name": "Magazzino",
-        "tasks": [
-          {
-            "id": "task-1689341855",
-            "name": "Carrellista",
-            "findings": [
-              {
-                "id": "finding-1689341870",
-                "description": "La pavimentazione del magazzino presenta sconnessioni e rotture.",
-                "hazard": "Rischio di inciampo per il personale, instabilità e potenziale ribaltamento del carrello elevatore.",
-                "riskLevel": 6,
-                "regulation": "D.Lgs. 81/08, Allegato IV",
-                "recommendation": "Effettuare un'immediata manutenzione e ripristino della pavimentazione per eliminare le sconnessioni.",
-              }
-            ],
-            "requiredDpi": [
-              { "name": "Scarpe antinfortunistiche" }
-            ]
-          }
-        ]
-      }
-    ]
-  },
-  "chatResponse": "Rilievo registrato per il magazzino. La pavimentazione sconnessa è un rischio significativo. C'è altro da aggiungere per la mansione di carrellista o passiamo a un'altra area?"
+  "reportUpdate": { /* ... report data ... */ },
+  "chatResponse": "Rilievo registrato per il magazzino. La pavimentazione sconnessa è un rischio significativo. C'è altro da aggiungere per la mansione di carrellista o passiamo a un'altra area?",
+  "citations": []
+}
+
+If you use a provided context about flooring regulations from a document with id 'kb-file-123', your response might be:
+{
+  "reportUpdate": { /* ... report data with specific regulation from the document ... */ },
+  "chatResponse": "Rilievo registrato. Come indicato nel D.Lgs. 81/08, la pavimentazione deve essere priva di protuberanze. Ho aggiunto la raccomandazione di ripristino.",
+  "citations": ["kb-file-123"]
 }
 
 If the user asks a general question, use the googleSearch tool to find relevant information, summarize it in the 'chatResponse' and include the sources. Do not update the report in this case unless the query is clearly a finding.
@@ -142,14 +127,33 @@ export interface GeminiResponse {
   sources?: { uri: string; title: string }[];
 }
 
+interface ParsedGeminiResponse {
+    reportUpdate: { workplaces: Report };
+    chatResponse: string;
+    citations?: string[];
+}
+
+
 export const generateResponse = async (
   currentReport: Report,
   prompt: string,
-  file?: File
+  file?: File,
+  knowledgeContext?: KnowledgeSource[]
 ): Promise<GeminiResponse> => {
+
+    let augmentedPrompt = `Based on the current report state provided below, please process my request.\n\nCurrent Report State:\n${JSON.stringify(currentReport, null, 2)}`;
     
-    const fullPrompt = `Based on the current report state provided below, please process my request.\n\nCurrent Report State:\n${JSON.stringify(currentReport, null, 2)}\n\nUser Request:\n${prompt}`;
-    const textPart = { text: fullPrompt };
+    if (knowledgeContext && knowledgeContext.length > 0) {
+        const contextString = knowledgeContext.map(source => 
+            `[Source ID: ${source.id}, Title: ${source.title}, Content URI: ${source.uri}]`
+        ).join('\n');
+        
+        augmentedPrompt = `--- INIZIO CONTESTO BASE DI CONOSCENZA ---\n${contextString}\n--- FINE CONTESTO BASE DI CONOSCENZA ---\n\n${augmentedPrompt}`;
+    }
+
+    augmentedPrompt += `\n\nUser Request:\n${prompt}`;
+    
+    const textPart = { text: augmentedPrompt };
     const parts: ({ text: string } | { inlineData: { data: string; mimeType: string; } })[] = [textPart];
 
     if (file) {
@@ -176,15 +180,19 @@ export const generateResponse = async (
                     type: Type.OBJECT,
                     properties: {
                         reportUpdate: reportSchema,
-                        chatResponse: { type: Type.STRING }
+                        chatResponse: { type: Type.STRING },
+                        citations: {
+                            type: Type.ARRAY,
+                            items: { type: Type.STRING }
+                        }
                     },
-                    required: ["reportUpdate", "chatResponse"]
+                    required: ["reportUpdate", "chatResponse", "citations"]
                 },
             },
         });
 
         const text = response.text.trim();
-        let parsedResponse: any;
+        let parsedResponse: ParsedGeminiResponse;
         try {
             parsedResponse = JSON.parse(text);
         } catch (e) {
@@ -197,11 +205,28 @@ export const generateResponse = async (
         
         const reportUpdate: Report = parsedResponse.reportUpdate?.workplaces ?? currentReport;
 
-        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-        const sources = groundingMetadata?.groundingChunks?.map((chunk: any) => ({
-            uri: chunk.web?.uri,
-            title: chunk.web?.title,
-        })).filter((source: any) => source.uri && source.title) ?? [];
+        // Handle sources from either RAG or Google Search
+        let sources: { uri: string; title: string }[] = [];
+        
+        // RAG sources (priority)
+        if (parsedResponse.citations && parsedResponse.citations.length > 0 && knowledgeContext) {
+            sources = parsedResponse.citations
+                .map(id => knowledgeContext.find(s => s.id === id))
+                .filter((source): source is KnowledgeSource => !!source)
+                .map(source => ({ uri: source.uri, title: source.title }));
+        }
+
+        // Google Search sources (fallback)
+        if (sources.length === 0) {
+            const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+            const webSources = groundingMetadata?.groundingChunks?.map((chunk: any) => ({
+                uri: chunk.web?.uri,
+                title: chunk.web?.title,
+            })).filter((source: any) => source.uri && source.title) ?? [];
+            if (webSources.length > 0) {
+                sources = webSources;
+            }
+        }
         
         return {
             reportUpdate,

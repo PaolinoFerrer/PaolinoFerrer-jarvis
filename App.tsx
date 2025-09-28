@@ -75,13 +75,17 @@ const App: React.FC = () => {
         setMessages(prev => [...prev, userMessage]);
         setIsLoading(true);
 
-        const geminiResult = await apiClient.generateResponse(report, text, file);
+        // RAG Step 1: Search Knowledge Base
+        const knowledgeContext = await apiClient.searchKnowledgeBase(text);
+        
+        // RAG Step 2: Send context and prompt to Gemini
+        const geminiResult = await apiClient.generateResponse(report, text, file, knowledgeContext);
 
         const modelMessage: ChatMessage = {
             id: `model-${Date.now()}`,
             role: 'model',
             text: geminiResult.chatResponse,
-            sources: currentUser?.role === 'admin' ? geminiResult.sources : undefined,
+            sources: geminiResult.sources, // Show sources to all users now
         };
 
         setReport(geminiResult.reportUpdate);

@@ -28,6 +28,7 @@ export const {
     addWebKnowledgeSource,
     addFileKnowledgeSource,
     deleteKnowledgeSource,
+    searchKnowledgeBase, // Export the new RAG search function
 } = backendService;
 
 // --- Gemini AI ---
