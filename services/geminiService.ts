@@ -111,7 +111,7 @@ Per ogni "finding", devi valutare tre fattori basandoti sulle scale sottostanti 
     *   3 (Probabile): È prevedibile che accada durante il ciclo di vita lavorativo.
     *   4 (Molto Probabile): È quasi certo che accada.
 
-3.  **Esposizione (exposure) - Frequenza di esposizione al pericolo:**
+3.  **Frequenza di Esposizione (exposure) - Frequenza con cui si è esposti al pericolo:**
     *   1 (Rara): L'esposizione al rischio avviene meno di una volta al mese.
     *   2 (Occasionale): L'esposizione avviene settimanalmente.
     *   3 (Frequente): L'esposizione avviene quotidianamente.

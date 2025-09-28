@@ -29,7 +29,7 @@ const MethodologyExplanation: React.FC = () => {
     const factors = [
         { name: 'Danno (D)', description: 'Gravità del potenziale infortunio', scale: ['1: Lieve', '2: Medio', '3: Grave', '4: Gravissimo'] },
         { name: 'Probabilità (P)', description: 'Probabilità che l\'evento accada', scale: ['1: Improbabile', '2: Poco Probabile', '3: Probabile', '4: Molto Probabile'] },
-        { name: 'Esposizione (E)', description: 'Frequenza di esposizione al pericolo', scale: ['1: Rara', '2: Occasionale', '3: Frequente', '4: Continua'] },
+        { name: 'Frequenza di Esposizione (F)', description: 'Frequenza di esposizione al pericolo', scale: ['1: Rara', '2: Occasionale', '3: Frequente', '4: Continua'] },
     ];
     
     const riskTiers = [
@@ -51,7 +51,7 @@ const MethodologyExplanation: React.FC = () => {
                 <div className="p-4 text-sm bg-jarvis-bg/20 rounded-b-lg">
                     <p className="mb-3 text-jarvis-text-secondary">Il livello di rischio viene calcolato con una formula che dà un peso esponenziale alla gravità del danno potenziale.</p>
                     <div className="text-center font-mono tracking-wider bg-jarvis-bg p-2 rounded-md mb-4">
-                        Rischio Grezzo (R) = Danno² &times; Probabilità &times; Esposizione
+                        Rischio Grezzo (R) = Danno² &times; Probabilità &times; Frequenza
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -86,11 +86,12 @@ const MethodologyExplanation: React.FC = () => {
 
 const RiskBadge: React.FC<{ finding: Finding }> = ({ finding }) => {
     const rawRisk = calculateRawRisk(finding);
+    const title = `Danno: ${finding.damage}, Probabilità: ${finding.probability}, Frequenza: ${finding.exposure} => Calcolo: ${finding.damage}² × ${finding.probability} × ${finding.exposure} = ${rawRisk}`;
     return (
         <div className={`text-sm rounded-lg border text-center ${getRiskColor(finding.riskLevel)}`}>
             <p className="font-bold px-3 py-1">Rischio: {finding.riskLevel}/10</p>
-            <p className="text-xs border-t border-current opacity-70 px-3 py-0.5 font-mono" title={`Valore grezzo del rischio: ${rawRisk}`}>
-                D:{finding.damage}²&times;P:{finding.probability}&times;E:{finding.exposure}={rawRisk}
+            <p className="text-xs border-t border-current opacity-70 px-3 py-0.5 font-mono" title={title}>
+                D{finding.damage}² &times; P{finding.probability} &times; F{finding.exposure} = {rawRisk}
             </p>
         </div>
     );
@@ -104,7 +105,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
     content += `========================================\n`;
     content += `METODOLOGIA DI VALUTAZIONE\n`;
     content += `========================================\n`;
-    content += `Formula: Rischio Grezzo = Danno^2 * Probabilità * Esposizione\n`;
+    content += `Formula: Rischio Grezzo = Danno^2 * Probabilità * Frequenza\n`;
     content += `Fasce: BASSO (R <= 15), MEDIO (15 < R <= 70), ALTO (R > 70)\n\n`;
     
     report.forEach(workplace => {
@@ -128,7 +129,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
               content += `  Rilievo #${findIndex + 1}:\n`;
               content += `    Descrizione: ${finding.description}\n`;
               content += `    Pericolo: ${finding.hazard}\n`;
-              content += `    Rischio Calcolato: ${finding.riskLevel}/10 (Calcolo: D:${finding.damage}^2 x P:${finding.probability} x E:${finding.exposure} = ${rawRisk})\n`;
+              content += `    Rischio Calcolato: ${finding.riskLevel}/10 (Calcolo: Danno ${finding.damage}² × Probabilità ${finding.probability} × Frequenza ${finding.exposure} = ${rawRisk})\n`;
               content += `    Normativa: ${finding.regulation}\n`;
               content += `    Raccomandazione: ${finding.recommendation}\n\n`;
             });
