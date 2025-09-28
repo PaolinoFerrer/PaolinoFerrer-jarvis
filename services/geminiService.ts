@@ -150,7 +150,7 @@ export const generateResponse = async (
     
     const fullPrompt = `Based on the current report state provided below, please process my request.\n\nCurrent Report State:\n${JSON.stringify(currentReport, null, 2)}\n\nUser Request:\n${prompt}`;
     const textPart = { text: fullPrompt };
-    const parts = [textPart];
+    const parts: ({ text: string } | { inlineData: { data: string; mimeType: string; } })[] = [textPart];
 
     if (file) {
       try {
@@ -180,7 +180,6 @@ export const generateResponse = async (
                     },
                     required: ["reportUpdate", "chatResponse"]
                 },
-                tools: [{ googleSearch: {} }]
             },
         });
 
@@ -216,5 +215,45 @@ export const generateResponse = async (
             reportUpdate: currentReport,
             chatResponse: "Si è verificato un errore di connessione con l'IA. Riprova tra poco.",
         };
+    }
+};
+
+export const findWebSources = async (topic: string): Promise<{ title: string; uri: string }[]> => {
+    const prompt = `Agisci come un ricercatore esperto di sicurezza sul lavoro in Italia. Il mio obiettivo è trovare fonti online autorevoli e pertinenti (siti istituzionali, normativi, associazioni di categoria, riviste specializzate) sull'argomento "${topic}". Restituisci un elenco di massimo 5 risultati. Per ogni risultato, fornisci un titolo chiaro e l'URL completo. La tua risposta DEVE essere solo ed esclusivamente un oggetto JSON contenente una singola chiave "sources", che è un array di oggetti, ognuno con le chiavi "title" e "uri". Non includere testo aggiuntivo, spiegazioni o saluti.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        sources: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    title: { type: Type.STRING },
+                                    uri: { type: Type.STRING }
+                                },
+                                required: ["title", "uri"]
+                            }
+                        }
+                    },
+                    required: ["sources"]
+                }
+            }
+        });
+        
+        const text = response.text.trim();
+        const parsedResponse = JSON.parse(text);
+        return parsedResponse.sources || [];
+
+    } catch (error) {
+        console.error("Error finding web sources:", error);
+        return [];
     }
 };

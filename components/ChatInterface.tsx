@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 // Fix: Removed file extensions from imports.
 import { ChatMessage } from '../types';
 import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
-import { MicrophoneIcon, PaperclipIcon, SendIcon, BrainCircuitIcon, StopIcon } from './icons';
+import { MicrophoneIcon, PaperclipIcon, SendIcon, LogoIcon, StopIcon } from './icons';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
@@ -75,7 +75,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
         {messages.map((msg) => (
           <div key={msg.id}>
             <div className={`flex items-end gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.role === 'model' && <BrainCircuitIcon className="w-8 h-8 text-jarvis-primary flex-shrink-0" />}
+              {msg.role === 'model' && <LogoIcon className="w-8 h-8 flex-shrink-0" />}
               <div className={`max-w-md lg:max-w-xl p-4 rounded-2xl ${msg.role === 'user' ? 'bg-jarvis-primary/80 text-white rounded-br-none' : 'bg-jarvis-bg text-jarvis-text rounded-bl-none'}`}>
                 <p className="whitespace-pre-wrap">{msg.text}</p>
                 {msg.photo && <img src={msg.photo} alt="Allegato" className="mt-2 rounded-lg max-h-48 w-auto" />}
@@ -99,7 +99,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
         ))}
          {isLoading && (
             <div className="flex items-end gap-3 justify-start">
-              <BrainCircuitIcon className="w-8 h-8 text-jarvis-primary flex-shrink-0" />
+              <LogoIcon className="w-8 h-8 flex-shrink-0" />
               <div className="max-w-md lg:max-w-xl p-4 rounded-2xl bg-jarvis-bg text-jarvis-text rounded-bl-none">
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-jarvis-secondary rounded-full animate-pulse"></div>

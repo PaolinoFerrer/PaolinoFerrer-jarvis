@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { KnowledgeSource } from '../types';
 import * as backendService from '../services/backendService';
+import { findWebSources } from '../services/geminiService';
 import {
   TrashIcon,
   SpinnerIcon,
@@ -9,6 +10,8 @@ import {
   ExclamationCircleIcon,
   GlobeAltIcon,
   DocumentTextIcon,
+  SearchIcon,
+  PlusIcon
 } from './icons';
 
 interface KnowledgeBaseModalProps {
@@ -33,6 +36,12 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
   const [newFile, setNewFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // State for assisted search
+  const [searchTopic, setSearchTopic] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<{title: string, uri: string}[]>([]);
+
+
   const fetchSources = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -50,7 +59,6 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
   useEffect(() => {
     if (isOpen) {
       fetchSources();
-      // Poll for status updates
       const interval = setInterval(fetchSources, 5000);
       return () => clearInterval(interval);
     }
@@ -67,16 +75,20 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
     }
   };
   
-  const handleAddWebSource = async (e: React.FormEvent) => {
+  const handleAddWebSource = async (e: React.FormEvent, url?: string, title?: string) => {
       e.preventDefault();
-      if (!newWebUrl.trim() || !newWebTitle.trim()) {
+      const finalUrl = url || newWebUrl;
+      const finalTitle = title || newWebTitle;
+
+      if (!finalUrl.trim() || !finalTitle.trim()) {
           alert("Per favore, inserisci sia l'URL che il titolo.");
           return;
       }
       try {
-          await backendService.addWebKnowledgeSource(newWebUrl, newWebTitle);
+          await backendService.addWebKnowledgeSource(finalUrl, finalTitle);
           setNewWebUrl('');
           setNewWebTitle('');
+          setSearchResults(prev => prev.filter(r => r.uri !== finalUrl));
           fetchSources(); // Refresh list
       } catch (e) {
           alert("Errore durante l'aggiunta della fonte web.");
@@ -105,35 +117,80 @@ const KnowledgeBaseModal: React.FC<KnowledgeBaseModalProps> = ({ isOpen, onClose
       }
   };
 
+  const handleSearchSources = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchTopic.trim()) return;
+    setIsSearching(true);
+    setSearchResults([]);
+    try {
+        const results = await findWebSources(searchTopic);
+        setSearchResults(results);
+    } catch (e) {
+        alert("Errore durante la ricerca delle fonti.");
+    } finally {
+        setIsSearching(false);
+    }
+  };
+
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-jarvis-bg/80 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-jarvis-surface w-full max-w-3xl rounded-lg shadow-xl p-6 m-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-jarvis-primary">Knowledge Base</h2>
-          <button onClick={fetchSources} className="text-sm text-jarvis-secondary hover:text-jarvis-primary">Aggiorna</button>
+      <div className="bg-jarvis-surface w-full max-w-4xl rounded-lg shadow-xl p-6 m-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-jarvis-primary">Base di Conoscenza</h2>
+          <button onClick={fetchSources} className="text-sm text-jarvis-secondary hover:text-jarvis-primary">Aggiorna Elenco</button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 pb-6 border-b border-jarvis-text/10">
-          <form onSubmit={handleAddWebSource}>
-              <h3 className="font-semibold text-jarvis-text mb-2">Aggiungi Pagina Web</h3>
-              <div className="space-y-2">
-                  <input type="text" value={newWebTitle} onChange={e => setNewWebTitle(e.target.value)} placeholder="Titolo (es. INAIL Rischio Elettrico)" className="w-full bg-jarvis-bg p-2 rounded-md border border-jarvis-text/10 focus:outline-none focus:ring-1 focus:ring-jarvis-primary"/>
-                  <input type="url" value={newWebUrl} onChange={e => setNewWebUrl(e.target.value)} placeholder="URL" className="w-full bg-jarvis-bg p-2 rounded-md border border-jarvis-text/10 focus:outline-none focus:ring-1 focus:ring-jarvis-primary"/>
-              </div>
-              <button type="submit" className="mt-2 w-full px-4 py-2 bg-jarvis-primary/20 text-jarvis-primary rounded-md hover:bg-jarvis-primary/30">Aggiungi Web</button>
-          </form>
-           <form onSubmit={handleAddFileSource}>
-              <h3 className="font-semibold text-jarvis-text mb-2">Aggiungi Documento</h3>
-               <div className="flex items-center gap-2 bg-jarvis-bg p-2 rounded-md border border-jarvis-text/10">
+        {/* --- ADD SOURCES AREA --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4 pb-4 border-b border-jarvis-text/10">
+          
+          {/* Assisted Search */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-jarvis-text">Ricerca Assistita Fonti</h3>
+            <form onSubmit={handleSearchSources} className="flex gap-2">
+                <input type="text" value={searchTopic} onChange={e => setSearchTopic(e.target.value)} placeholder="Es: normativa antincendio" className="flex-1 bg-jarvis-bg p-2 rounded-md border border-jarvis-text/10 focus:outline-none focus:ring-1 focus:ring-jarvis-primary"/>
+                <button type="submit" disabled={isSearching} className="p-2 bg-jarvis-primary/20 text-jarvis-primary rounded-md hover:bg-jarvis-primary/30 disabled:opacity-50">
+                    {isSearching ? <SpinnerIcon className="w-5 h-5"/> : <SearchIcon className="w-5 h-5"/>}
+                </button>
+            </form>
+            {searchResults.length > 0 && (
+                <div className="space-y-2 pt-2 max-h-40 overflow-y-auto">
+                    {searchResults.map((result, i) => (
+                        <div key={i} className="bg-jarvis-bg/50 p-2 rounded-md flex justify-between items-center gap-2">
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-semibold truncate" title={result.title}>{result.title}</p>
+                                <a href={result.uri} target="_blank" rel="noopener noreferrer" className="text-xs text-jarvis-text-secondary hover:underline truncate block">{result.uri}</a>
+                            </div>
+                            <button onClick={(e) => handleAddWebSource(e, result.uri, result.title)} className="p-1.5 bg-green-500/20 text-green-400 rounded-full hover:bg-green-500/30 flex-shrink-0" title="Aggiungi alla conoscenza">
+                                <PlusIcon className="w-4 h-4"/>
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+          </div>
+
+          {/* Manual Add */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-jarvis-text">Aggiunta Manuale</h3>
+             <form onSubmit={handleAddWebSource} className="space-y-2">
+                <input type="text" value={newWebTitle} onChange={e => setNewWebTitle(e.target.value)} placeholder="Titolo Pagina Web" className="w-full bg-jarvis-bg p-2 rounded-md border border-jarvis-text/10 focus:outline-none focus:ring-1 focus:ring-jarvis-primary"/>
+                <input type="url" value={newWebUrl} onChange={e => setNewWebUrl(e.target.value)} placeholder="URL Pagina Web" className="w-full bg-jarvis-bg p-2 rounded-md border border-jarvis-text/10 focus:outline-none focus:ring-1 focus:ring-jarvis-primary"/>
+                <button type="submit" className="w-full px-4 py-2 bg-jarvis-primary/20 text-jarvis-primary rounded-md hover:bg-jarvis-primary/30 text-sm">Aggiungi Web Manualmente</button>
+            </form>
+             <form onSubmit={handleAddFileSource} className="space-y-2">
+                <div className="flex items-center gap-2 bg-jarvis-bg p-1 rounded-md border border-jarvis-text/10">
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="w-full text-sm text-jarvis-text-secondary file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-jarvis-primary/20 file:text-jarvis-primary hover:file:bg-jarvis-primary/30"/>
-               </div>
-              <button type="submit" className="mt-2 w-full px-4 py-2 bg-jarvis-primary/20 text-jarvis-primary rounded-md hover:bg-jarvis-primary/30 disabled:opacity-50" disabled={!newFile}>Aggiungi File</button>
-          </form>
+                </div>
+                <button type="submit" className="w-full px-4 py-2 bg-jarvis-primary/20 text-jarvis-primary rounded-md hover:bg-jarvis-primary/30 text-sm disabled:opacity-50" disabled={!newFile}>Aggiungi File</button>
+            </form>
+          </div>
         </div>
 
+
+        {/* --- SOURCES LIST --- */}
         <div className="flex-1 overflow-y-auto pr-2">
           {isLoading && sources.length === 0 ? (
             <p className="text-center text-jarvis-text-secondary py-10">Caricamento...</p>

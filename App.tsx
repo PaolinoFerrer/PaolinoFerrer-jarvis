@@ -11,7 +11,7 @@ import KnowledgeBaseModal from './components/KnowledgeBaseModal';
 import * as authService from './services/authService';
 import * as driveService from './services/googleDriveService';
 import { generateResponse } from './services/geminiService';
-import { BrainCircuitIcon } from './components/icons';
+import { LogoIcon } from './components/icons';
 
 
 const App: React.FC = () => {
@@ -74,14 +74,14 @@ const App: React.FC = () => {
             id: `model-${Date.now()}`,
             role: 'model',
             text: geminiResult.chatResponse,
-            sources: geminiResult.sources,
+            sources: currentUser?.role === 'admin' ? geminiResult.sources : undefined,
         };
 
         setReport(geminiResult.reportUpdate);
         setMessages(prev => [...prev, modelMessage]);
         setIsLoading(false);
 
-    }, [report]);
+    }, [report, currentUser]);
 
     const handleLoginDrive = async () => {
         await driveService.signIn();
@@ -170,9 +170,7 @@ const App: React.FC = () => {
     const handleLogout = () => {
         authService.logout();
         setCurrentUser(null);
-        // In a real app you might redirect to a login screen
-        // For this mock, we'll just log in the default user again for simplicity
-         const allUsers = authService.getMockUsers();
+        const allUsers = authService.getMockUsers();
          if (allUsers.length > 0) {
             setCurrentUser(authService.login(allUsers[0].id));
          }
@@ -183,15 +181,17 @@ const App: React.FC = () => {
         <div className="bg-jarvis-bg min-h-screen text-jarvis-text font-sans flex flex-col p-4 lg:p-6">
             <header className="flex justify-between items-center mb-4 flex-shrink-0 px-2">
                 <div className="flex items-center gap-3">
-                    <BrainCircuitIcon className="w-8 h-8 text-jarvis-primary" />
-                    <h1 className="text-2xl font-bold text-jarvis-text">Jarvis Safety Assistant</h1>
+                    <LogoIcon className="w-8 h-8" />
+                    <h1 className="text-2xl font-bold text-jarvis-text">Jarvis DVR</h1>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button onClick={() => setIsKnowledgeBaseOpen(true)} className="text-sm text-jarvis-text-secondary hover:text-jarvis-primary transition-colors">
-                        Knowledge Base
-                    </button>
+                    {currentUser?.role === 'admin' && (
+                        <button onClick={() => setIsKnowledgeBaseOpen(true)} className="text-sm text-jarvis-text-secondary hover:text-jarvis-primary transition-colors">
+                            Base di Conoscenza
+                        </button>
+                    )}
                     <button onClick={handleOpenArchive} className="text-sm text-jarvis-text-secondary hover:text-jarvis-primary transition-colors">
-                        Archivio Drive
+                        Archivio
                     </button>
                     {currentUser && <UserMenu currentUser={currentUser} users={users} onSwitchUser={handleSwitchUser} onLogout={handleLogout} />}
                 </div>
@@ -216,10 +216,12 @@ const App: React.FC = () => {
                 onDelete={handleDeleteReport}
                 onRefresh={handleRefreshArchive}
             />
-            <KnowledgeBaseModal
-                isOpen={isKnowledgeBaseOpen}
-                onClose={() => setIsKnowledgeBaseOpen(false)}
-            />
+            {currentUser?.role === 'admin' && (
+                <KnowledgeBaseModal
+                    isOpen={isKnowledgeBaseOpen}
+                    onClose={() => setIsKnowledgeBaseOpen(false)}
+                />
+            )}
         </div>
     );
 };
