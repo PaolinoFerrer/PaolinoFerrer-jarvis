@@ -1,8 +1,7 @@
 // Import the functions you need from the SDKs you need
-// FIX: Corrected Firebase initialization. The previous namespace import `import * as FirebaseApp`
-// is not the standard way for the Firebase v9+ modular SDK and caused an error.
-// Switched to a direct named import of `initializeApp`.
-import { initializeApp } from "firebase/app";
+// FIX: The direct named import `initializeApp` was failing, likely due to a module resolution issue in the build environment.
+// Switched to a namespace import (`* as firebase`) which can be more robust in these cases.
+import * as firebase from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -17,7 +16,7 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = firebase.initializeApp(firebaseConfig);
 
 // Initialize and export Firebase services
 export const db = getFirestore(app);
