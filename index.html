@@ -5,11 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Jarvis DVR - Assistente Sicurezza</title>
     <script>
-      // Polyfill per process.env per evitare errori di runtime nel browser.
-      // La chiave API viene fornita dall'ambiente di esecuzione.
-      if (typeof window.process === 'undefined') {
-        window.process = { env: { API_KEY: '' } };
-      }
+      // Polyfill robusto per process.env per prevenire errori di caricamento.
+      // Le librerie moderne a volte si aspettano che questa struttura esista.
+      // La chiave API reale viene fornita dall'ambiente di esecuzione, ma questo
+      // previene un crash se la libreria viene caricata prima che la chiave sia disponibile.
+      var process = process || {};
+      process.env = process.env || {};
+      process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+      process.env.API_KEY = process.env.API_KEY || '';
     </script>
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#101418">

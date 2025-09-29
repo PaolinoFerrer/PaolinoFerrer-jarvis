@@ -1,8 +1,22 @@
 import { GoogleGenAI, GenerateContentResponse, Type, Part } from '@google/genai';
 import { Report, ChatMessage } from '../types';
 
-// Initialize the Gemini client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Dichiarato ma non inizializzato per evitare crash all'avvio.
+let ai: GoogleGenAI | null = null;
+
+/**
+ * Inizializza e restituisce in modo pigro l'istanza del client GoogleGenAI.
+ * Questo impedisce all'app di bloccarsi al caricamento se la chiave API non è disponibile.
+ */
+const getAiClient = (): GoogleGenAI => {
+    if (!ai) {
+        // Il costruttore solleverà un errore se la chiave API non è valida o mancante.
+        // Questo errore verrà catturato dal blocco try...catch della funzione chiamante.
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return ai;
+};
+
 
 // Helper function to convert a File object to a Gemini Part
 const fileToGenerativePart = async (file: File): Promise<Part> => {
@@ -136,7 +150,8 @@ export const generateResponse = async (
     }
     
     try {
-        const response: GenerateContentResponse = await ai.models.generateContent({
+        const client = getAiClient(); // Ottieni il client inizializzato in modo pigro
+        const response: GenerateContentResponse = await client.models.generateContent({
             model: model,
             contents: { parts: parts },
             config: {
@@ -182,7 +197,8 @@ export const findWebSources = async (topic: string): Promise<{ title: string; ur
     }
 
     try {
-        const response = await ai.models.generateContent({
+        const client = getAiClient(); // Ottieni il client inizializzato in modo pigro
+        const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
             contents: `Trova fonti web autorevoli e pertinenti sulla seguente tematica di sicurezza sul lavoro in Italia: "${topic}". Concentrati su fonti istituzionali (INAIL, Ministero del Lavoro, Normattiva) o siti specializzati affidabili.`,
             config: {
