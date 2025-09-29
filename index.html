@@ -4,6 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Jarvis DVR - Assistente Sicurezza</title>
+    <script>
+      // Polyfill per process.env per evitare errori di runtime nel browser.
+      // La chiave API viene fornita dall'ambiente di esecuzione.
+      if (typeof window.process === 'undefined') {
+        window.process = { env: { API_KEY: '' } };
+      }
+    </script>
     <link rel="manifest" href="/manifest.webmanifest">
     <meta name="theme-color" content="#101418">
     <link rel="apple-touch-icon" href="/icon-192.svg">
