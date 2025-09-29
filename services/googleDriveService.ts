@@ -1,15 +1,15 @@
 import { Report, DriveFile } from '../types.ts';
 import { db } from './firebase.ts';
-import firebase from 'firebase/app';
-
+import { collection, query, orderBy, getDocs, doc, getDoc, addDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
 
 const REPORTS_COLLECTION = 'reports';
 const AUTH_STORAGE_KEY = 'jarvis-gdrive-loggedin'; // Kept for UI mock purposes
 
 export const listReports = async (): Promise<DriveFile[]> => {
     console.log("FIRESTORE: Listing reports");
-    const q = db.collection(REPORTS_COLLECTION).orderBy('createdAt', 'desc');
-    const querySnapshot = await q.get();
+    const reportsCollection = collection(db, REPORTS_COLLECTION);
+    const q = query(reportsCollection, orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
     const files: DriveFile[] = [];
     querySnapshot.forEach(doc => {
         files.push({ id: doc.id, name: doc.data().name });
@@ -19,11 +19,12 @@ export const listReports = async (): Promise<DriveFile[]> => {
 
 export const loadReport = async (fileId: string): Promise<Report> => {
     console.log("FIRESTORE: Loading report", fileId);
-    const docRef = db.collection(REPORTS_COLLECTION).doc(fileId);
-    const docSnap = await docRef.get();
+    const docRef = doc(db, REPORTS_COLLECTION, fileId);
+    const docSnap = await getDoc(docRef);
 
-    if (docSnap.exists) {
-        return docSnap.data()!.content as Report;
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        return data.content as Report;
     } else {
         throw new Error("Report not found in Firestore.");
     }
@@ -34,10 +35,10 @@ export const saveReport = async (report: Report): Promise<DriveFile> => {
     const workplaceName = report[0]?.name || 'SenzaNome';
     const newName = `DVR ${workplaceName} - ${new Date().toLocaleDateString('it-IT')}.json`;
     
-    const docRef = await db.collection(REPORTS_COLLECTION).add({
+    const docRef = await addDoc(collection(db, REPORTS_COLLECTION), {
         name: newName,
         content: report,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        createdAt: serverTimestamp()
     });
     
     return { id: docRef.id, name: newName };
@@ -45,7 +46,7 @@ export const saveReport = async (report: Report): Promise<DriveFile> => {
 
 export const deleteReport = async (fileId: string): Promise<void> => {
     console.log("FIRESTORE: Deleting report", fileId);
-    await db.collection(REPORTS_COLLECTION).doc(fileId).delete();
+    await deleteDoc(doc(db, REPORTS_COLLECTION, fileId));
 };
 
 // --- Mock Authentication (Kept for UI compatibility) ---

@@ -1,7 +1,8 @@
 // Import the functions you need from the SDKs you need
-import firebase from "firebase/app";
-import "firebase/firestore";
-import "firebase/storage";
+// FIX: Changed to namespace import to resolve module resolution issue.
+import * as FirebaseApp from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -13,12 +14,9 @@ const firebaseConfig = {
   appId: "1:672925946803:web:33a3ddf0206157bc2431c6"
 };
 
-// Initialize Firebase, preventing re-initialization
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-
+// Initialize Firebase
+const app = FirebaseApp.initializeApp(firebaseConfig);
 
 // Initialize and export Firebase services
-export const db = firebase.firestore();
-export const storage = firebase.storage();
+export const db = getFirestore(app);
+export const storage = getStorage(app);

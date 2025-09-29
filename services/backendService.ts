@@ -1,19 +1,21 @@
 import { KnowledgeSource } from '../types.ts';
 import { db, storage } from './firebase.ts'; // Import the initialized Firebase app
-import firebase from 'firebase/app';
+import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, doc, deleteDoc, Timestamp } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
 
 const KNOWLEDGE_COLLECTION = 'knowledge_sources';
 
 export const listKnowledgeSources = async (): Promise<KnowledgeSource[]> => {
-    const q = db.collection(KNOWLEDGE_COLLECTION).orderBy('createdAt', 'desc');
-    const querySnapshot = await q.get();
+    const q = query(collection(db, KNOWLEDGE_COLLECTION), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
     const sources: KnowledgeSource[] = [];
     querySnapshot.forEach((doc) => {
         const data = doc.data();
         sources.push({
             id: doc.id,
             ...data,
-            createdAt: (data.createdAt as firebase.firestore.Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+            createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
         } as KnowledgeSource);
     });
     return sources;
@@ -25,9 +27,9 @@ export const addWebKnowledgeSource = async (uri: string, title: string): Promise
         uri,
         title,
         status: 'ready', // Web sources are instantly ready
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        createdAt: serverTimestamp()
     };
-    const docRef = await db.collection(KNOWLEDGE_COLLECTION).add(newSource);
+    const docRef = await addDoc(collection(db, KNOWLEDGE_COLLECTION), newSource);
     return { ...newSource, id: docRef.id, createdAt: new Date().toISOString() } as KnowledgeSource;
 };
 
@@ -38,14 +40,14 @@ export const addFileKnowledgeSource = async (file: File): Promise<KnowledgeSourc
         uri: `files/${file.name}`,
         title: file.name,
         status: 'processing',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        createdAt: serverTimestamp()
     };
-    const docRef = await db.collection(KNOWLEDGE_COLLECTION).add(pendingSource);
+    const docRef = await addDoc(collection(db, KNOWLEDGE_COLLECTION), pendingSource);
     
     // 2. Upload the file to Firebase Storage
-    const storageRef = storage.ref(`knowledge-files/${docRef.id}/${file.name}`);
-    await storageRef.put(file);
-    const downloadURL = await storageRef.getDownloadURL();
+    const storageRef = ref(storage, `knowledge-files/${docRef.id}/${file.name}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
     
     // 3. Update the document with the final URL and ready status (This part would typically be a cloud function for robustness)
     // For now, we simulate this update client-side.
@@ -58,7 +60,7 @@ export const addFileKnowledgeSource = async (file: File): Promise<KnowledgeSourc
 
 
 export const deleteKnowledgeSource = async (sourceId: string): Promise<void> => {
-    await db.collection(KNOWLEDGE_COLLECTION).doc(sourceId).delete();
+    await deleteDoc(doc(db, KNOWLEDGE_COLLECTION, sourceId));
     // Note: Deleting the file from Storage would require a backend function for security.
 };
 
