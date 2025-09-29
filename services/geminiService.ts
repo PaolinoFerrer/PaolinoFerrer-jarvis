@@ -1,12 +1,102 @@
-// Fix: Replaced placeholder content with a mock implementation of the Gemini service.
-import { Report, ChatMessage, Finding } from '../types';
+import { GoogleGenAI, GenerateContentResponse, Type, Part } from '@google/genai';
+import { Report, ChatMessage } from '../types';
 
-// Helper function to simulate a delay
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+// Initialize the Gemini client
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Helper function to convert a File object to a Gemini Part
+const fileToGenerativePart = async (file: File): Promise<Part> => {
+  const base64EncodedData = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  return {
+    inlineData: {
+      data: base64EncodedData,
+      mimeType: file.type,
+    },
+  };
+};
+
+// Define the precise JSON schema for the model's output
+const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        chatResponse: {
+            type: Type.STRING,
+            description: "A friendly, conversational response in Italian summarizing the changes made to the report. Must be detailed."
+        },
+        reportUpdate: {
+            type: Type.ARRAY,
+            description: "The entire updated safety report structure (DVR). MUST include all previous workplaces, tasks, and findings, plus any new ones. Do not omit existing data.",
+            items: { // Workplace
+                type: Type.OBJECT,
+                properties: {
+                    id: { type: Type.STRING },
+                    name: { type: Type.STRING },
+                    tasks: {
+                        type: Type.ARRAY,
+                        items: { // Task
+                            type: Type.OBJECT,
+                            properties: {
+                                id: { type: Type.STRING },
+                                name: { type: Type.STRING },
+                                requiredDpi: {
+                                    type: Type.ARRAY,
+                                    items: { // DpiItem
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            name: { type: Type.STRING },
+                                            notes: { type: Type.STRING, nullable: true }
+                                        },
+                                        required: ['name']
+                                    }
+                                },
+                                findings: {
+                                    type: Type.ARRAY,
+                                    items: { // Finding
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            id: { type: Type.STRING },
+                                            description: { type: Type.STRING },
+                                            hazard: { type: Type.STRING },
+                                            damage: { type: Type.NUMBER, description: "Magnitude of Damage (1-4)" },
+                                            probability: { type: Type.NUMBER, description: "Probability of Occurrence (1-4)" },
+                                            exposure: { type: Type.NUMBER, description: "Frequency of Exposure (1-4)" },
+                                            riskLevel: { type: Type.NUMBER, description: "Calculated risk level (1-10)" },
+                                            regulation: { type: Type.STRING, description: "Relevant safety regulation (e.g., D.Lgs. 81/08)" },
+                                            recommendation: { type: Type.STRING },
+                                            photo: {
+                                                type: Type.OBJECT,
+                                                nullable: true,
+                                                properties: {
+                                                    analysis: { type: Type.STRING, description: "Brief analysis of the photo if one was provided." }
+                                                },
+                                                required: ['analysis']
+                                            }
+                                        },
+                                        required: ['id', 'description', 'hazard', 'damage', 'probability', 'exposure', 'riskLevel', 'regulation', 'recommendation']
+                                    }
+                                }
+                            },
+                            required: ['id', 'name', 'requiredDpi', 'findings']
+                        }
+                    }
+                },
+                required: ['id', 'name', 'tasks']
+            }
+        }
+    },
+    required: ['chatResponse', 'reportUpdate']
+};
+
 
 /**
- * Mocks the response from the Gemini API for chat and report generation.
- * This function simulates analyzing user input and updating the safety report.
+ * Generates a response from the Gemini API for chat and report generation.
+ * This function analyzes user input and updates the safety report.
  */
 export const generateResponse = async (
   currentReport: Report,
@@ -14,97 +104,112 @@ export const generateResponse = async (
   file?: File,
   knowledgeContext?: string
 ): Promise<{ chatResponse: string; reportUpdate: Report, sources?: ChatMessage['sources'] }> => {
-  await delay(1500); // Simulate network latency
 
-  console.log('GEMINI MOCK: Generating response for:', { text, file, knowledgeContext });
+    const systemInstruction = `Sei Jarvis, un assistente AI esperto in sicurezza sul lavoro (D.Lgs. 81/08) che aiuta a compilare un Documento di Valutazione del Rischio (DVR).
+    Il tuo compito è analizzare la richiesta dell'utente, l'eventuale foto, il contesto della base di conoscenza e lo stato attuale del report (in JSON).
+    Devi aggiornare il report JSON aggiungendo o modificando luoghi di lavoro, mansioni o rilievi (findings).
+    Quando aggiungi un nuovo elemento, genera un ID univoco (es: 'wp-', 'task-', 'find-' seguito da un timestamp).
+    Per ogni rilievo, valuta Danno(1-4), Probabilità(1-4), Esposizione(1-4) e calcola il Rischio(1-10) usando una formula non lineare che dia più peso al danno.
+    Devi SEMPRE restituire l'INTERO report aggiornato, non solo le modifiche.
+    La tua risposta DEVE essere un oggetto JSON che rispetta lo schema fornito.
+    La 'chatResponse' deve essere una sintesi in italiano, colloquiale e chiara delle modifiche apportate al report.`;
 
-  const newReport = JSON.parse(JSON.stringify(currentReport)); // Deep copy
-  let chatResponse = "Non ho capito la tua richiesta. Prova a descrivere un rischio o una mansione.";
-  
-  const lowerText = text.toLowerCase();
+    const model = 'gemini-2.5-flash';
+    const parts: Part[] = [
+        { text: `Contesto dalla base di conoscenza: ${knowledgeContext || 'Nessuno'}` },
+        { text: `Stato attuale del Report (DVR) in formato JSON:\n${JSON.stringify(currentReport, null, 2)}`},
+        { text: `Richiesta utente: "${text}"`},
+    ];
 
-  // Basic keyword-based logic for mocking
-  if (lowerText.includes('scaffale') || lowerText.includes('magazzino') || file) {
-    const workplaceName = "Magazzino Principale";
-    const taskName = "Stoccaggio Materiali";
-
-    let workplace = newReport.find((w: any) => w.name === workplaceName);
-    if (!workplace) {
-      workplace = { id: `wp-${Date.now()}`, name: workplaceName, tasks: [] };
-      newReport.push(workplace);
-    }
-
-    let task = workplace.tasks.find((t: any) => t.name === taskName);
-    if (!task) {
-      task = { id: `task-${Date.now()}`, name: taskName, findings: [], requiredDpi: [{name: 'Guanti da lavoro'}, {name: 'Scarpe antinfortunistiche'}] };
-      workplace.tasks.push(task);
+    if (file) {
+        try {
+            const imagePart = await fileToGenerativePart(file);
+            parts.unshift(imagePart); // Add image at the beginning for better analysis
+             parts.push({ text: "Analizza attentamente l'immagine fornita per identificare pericoli visibili e usala come base per il nuovo rilievo."});
+        } catch (error) {
+            console.error("Error processing file:", error);
+            return {
+                chatResponse: "Si è verificato un errore durante l'elaborazione del file. Riprova.",
+                reportUpdate: currentReport
+            };
+        }
     }
     
-    const newFinding: Finding = {
-      id: `find-${Date.now()}`,
-      description: file ? `Materiale stoccato in modo disordinato su scaffalatura, come da foto.` : `Identificato potenziale rischio di caduta materiale da scaffalatura.`,
-      hazard: "Caduta di oggetti dall'alto",
-      damage: 3, // Grave
-      probability: 2, // Possibile
-      exposure: 3, // Frequente
-      riskLevel: 6, // D*P*E = 3*2*3 = 18 -> Mappato su scala 1-10
-      regulation: "D.Lgs. 81/08 - Allegato IV",
-      recommendation: "Verificare la stabilità e il corretto stoccaggio del materiale. Fissare gli scaffali e non superare il carico massimo.",
-      photo: file ? { analysis: 'Analisi della foto allegata.', base64: 'mock-base64-string' } : undefined
-    };
+    try {
+        const response: GenerateContentResponse = await ai.models.generateContent({
+            model: model,
+            contents: { parts: parts },
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: responseSchema,
+            },
+        });
+        
+        const jsonResponse = JSON.parse(response.text);
 
-    task.findings.push(newFinding);
-    chatResponse = `Ho aggiunto un nuovo rilievo per il **${workplaceName}**, mansione **${taskName}**.
-- **Rilievo**: ${newFinding.description}
-- **Rischio**: ${newFinding.hazard} (Livello: ${newFinding.riskLevel}/10)
-- **Raccomandazione**: ${newFinding.recommendation}`;
+        // Basic validation
+        if (!jsonResponse.chatResponse || !jsonResponse.reportUpdate) {
+            throw new Error("Invalid JSON structure in response.");
+        }
+        
+        return {
+            chatResponse: jsonResponse.chatResponse,
+            reportUpdate: jsonResponse.reportUpdate,
+            sources: [] // Sources for Gemini responses are not from grounding search in this case
+        };
 
-    if(knowledgeContext) {
-        chatResponse += `\n\n_Informazioni dalla base di conoscenza: ${knowledgeContext}_`
+    } catch (error) {
+        console.error("Error calling Gemini API:", error);
+        return {
+            chatResponse: "Mi dispiace, si è verificato un errore durante la comunicazione con l'intelligenza artificiale. Controlla la console per i dettagli.",
+            reportUpdate: currentReport
+        };
     }
-
-
-  } else if (lowerText.includes('ufficio') || lowerText.includes('cavo')) {
-      chatResponse = "Ho capito. Per l'area ufficio, ho aggiunto un rilievo relativo ai cavi di alimentazione a terra che costituiscono un pericolo di inciampo. Ho raccomandato di utilizzare delle canaline passacavo.";
-      // A more complete mock would also update the report here.
-  }
-
-  return { chatResponse, reportUpdate: newReport, sources: [] };
 };
 
-
 /**
- * Mocks a search for web sources using Gemini with Google Search tool.
+ * Searches for web sources using Gemini with Google Search tool.
  */
 export const findWebSources = async (topic: string): Promise<{ title: string; uri: string }[]> => {
-    await delay(1000);
-    console.log("GEMINI MOCK: Searching web for:", topic);
-
     if (!topic || topic.trim().length < 3) {
         return [];
     }
     
-    // Simulate an error if the query is too generic
-    if (topic.toLowerCase().includes('sicurezza')) {
+    // Simulate an error if the query is too generic (as per old mock, good UX)
+    if (topic.toLowerCase().includes('sicurezza') && topic.trim().split(' ').length < 2) {
         throw new Error("La tua ricerca è troppo generica. Prova a specificare una normativa o un rischio (es: 'rischio elettrico cantiere').");
     }
 
-    // Return mock data based on topic
-    if (topic.toLowerCase().includes('antincendio')) {
-        return [
-            { title: "Norme di prevenzione incendi - Vigili del Fuoco", uri: "https://www.vigilfuoco.it/aspx/norme_prevenzione.aspx" },
-            { title: "D.M. 10 marzo 1998 - Criteri generali di sicurezza antincendio", uri: "https://www.gazzettaufficiale.it/eli/id/1998/04/07/098A3228/sg" }
-        ];
-    }
-    if (topic.toLowerCase().includes('81/08')) {
-        return [
-             { title: "DECRETO LEGISLATIVO 9 aprile 2008, n. 81 - Normattiva", uri: "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2008-04-09;81" },
-             { title: "Testo Unico Sicurezza sul Lavoro (D.Lgs. 81/08)", uri: "https://www.lavoro.gov.it/temi-e-priorita/salute-e-sicurezza/focus-on/testo-unico-sicurezza-sul-lavoro/Pagine/default.aspx" }
-        ];
-    }
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Trova fonti web autorevoli e pertinenti sulla seguente tematica di sicurezza sul lavoro in Italia: "${topic}". Concentrati su fonti istituzionali (INAIL, Ministero del Lavoro, Normattiva) o siti specializzati affidabili.`,
+            config: {
+                tools: [{googleSearch: {}}],
+            },
+        });
 
-    return [
-        { title: `Risultati di ricerca per: ${topic}`, uri: `https://www.google.com/search?q=${encodeURIComponent(topic)}` },
-        { title: "INAIL - Istituto Nazionale per l'Assicurazione contro gli Infortuni sul Lavoro", uri: "https://www.inail.it" }
-    ];
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        
+        if (!groundingChunks) {
+            return [];
+        }
+
+        const sources = groundingChunks.map(chunk => ({
+            uri: chunk.web?.uri || '',
+            title: chunk.web?.title || 'Fonte Sconosciuta'
+        })).filter(source => source.uri); // Filter out empty URIs
+        
+        // Deduplicate sources based on URI
+        const uniqueSources = Array.from(new Map(sources.map(item => [item.uri, item])).values());
+        
+        // FIX: The type inference for `uniqueSources` was failing, resulting in `unknown[]`.
+        // We cast it to the correct type to resolve the assignment error on the return statement.
+        return uniqueSources as { title: string; uri: string }[];
+
+    } catch (error) {
+        console.error("Error during web source search:", error);
+        throw new Error("Si è verificato un errore durante la ricerca delle fonti. Riprova.");
+    }
 };
