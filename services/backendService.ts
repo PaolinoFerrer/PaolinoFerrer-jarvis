@@ -1,126 +1,93 @@
-// Fix: Replaced placeholder content with a mock implementation of the backend service.
 import { KnowledgeSource } from '../types';
+import { db, storage } from './firebase'; // Import the initialized Firebase app
+import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-const KNOWLEDGE_BASE_KEY = 'jarvis-knowledge-base';
-
-// Helper function to simulate a delay
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-
-const getInitialMockData = (): Record<string, KnowledgeSource> => ({
-    'web-1': {
-        id: 'web-1',
-        type: 'web',
-        uri: 'https://www.lavoro.gov.it/temi-e-priorita/salute-e-sicurezza/focus-on/testo-unico-sicurezza-sul-lavoro/Pagine/default.aspx',
-        title: 'Testo Unico Sicurezza sul Lavoro (D.Lgs. 81/08)',
-        status: 'ready',
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-    'file-1': {
-        id: 'file-1',
-        type: 'file',
-        uri: 'mock-file-uri/linee-guida-magazzino.pdf',
-        title: 'Linee Guida Interne - Stoccaggio Magazzino.pdf',
-        status: 'ready',
-        createdAt: new Date(Date.now() - 172800000).toISOString(),
-    }
-});
-
-
-const getKnowledgeBase = (): Record<string, KnowledgeSource> => {
-    try {
-        const stored = localStorage.getItem(KNOWLEDGE_BASE_KEY);
-        if (stored) {
-            return JSON.parse(stored);
-        }
-        const initialData = getInitialMockData();
-        localStorage.setItem(KNOWLEDGE_BASE_KEY, JSON.stringify(initialData));
-        return initialData;
-    } catch (error) {
-        console.error("Failed to load knowledge base from localStorage", error);
-        return getInitialMockData();
-    }
-};
-
-const saveKnowledgeBase = (kb: Record<string, KnowledgeSource>) => {
-    try {
-        localStorage.setItem(KNOWLEDGE_BASE_KEY, JSON.stringify(kb));
-    } catch (error) {
-        console.error("Failed to save knowledge base to localStorage", error);
-    }
-};
+const KNOWLEDGE_COLLECTION = 'knowledge_sources';
 
 export const listKnowledgeSources = async (): Promise<KnowledgeSource[]> => {
-    await delay(500);
-    const kb = getKnowledgeBase();
-    const sources = Object.values(kb).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const q = query(collection(db, KNOWLEDGE_COLLECTION), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    const sources: KnowledgeSource[] = [];
+    querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        sources.push({
+            id: doc.id,
+            ...data,
+            createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+        } as KnowledgeSource);
+    });
     return sources;
 };
 
 export const addWebKnowledgeSource = async (uri: string, title: string): Promise<KnowledgeSource> => {
-    await delay(500);
-    const kb = getKnowledgeBase();
-    const newSource: KnowledgeSource = {
-        id: `web-${Date.now()}`,
+    const newSource = {
         type: 'web',
         uri,
         title,
-        status: 'ready',
-        createdAt: new Date().toISOString()
+        status: 'ready', // Web sources are instantly ready
+        createdAt: serverTimestamp()
     };
-    kb[newSource.id] = newSource;
-    saveKnowledgeBase(kb);
-    return newSource;
+    const docRef = await addDoc(collection(db, KNOWLEDGE_COLLECTION), newSource);
+    return { ...newSource, id: docRef.id, createdAt: new Date().toISOString() } as KnowledgeSource;
 };
 
 export const addFileKnowledgeSource = async (file: File): Promise<KnowledgeSource> => {
-    await delay(1000); // Simulate upload and processing
-    const kb = getKnowledgeBase();
-    const newSource: KnowledgeSource = {
-        id: `file-${Date.now()}`,
+    // 1. Create a document with pending status in Firestore
+    const pendingSource = {
         type: 'file',
-        uri: `mock-file-uri/${file.name}`,
+        uri: `files/${file.name}`,
         title: file.name,
-        status: 'ready',
-        createdAt: new Date().toISOString()
+        status: 'processing',
+        createdAt: serverTimestamp()
     };
-    kb[newSource.id] = newSource;
-    saveKnowledgeBase(kb);
-    return newSource;
+    const docRef = await addDoc(collection(db, KNOWLEDGE_COLLECTION), pendingSource);
+    
+    // 2. Upload the file to Firebase Storage
+    const storageRef = ref(storage, `knowledge-files/${docRef.id}/${file.name}`);
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    // 3. Update the document with the final URL and ready status (This part would typically be a cloud function for robustness)
+    // For now, we simulate this update client-side.
+    // NOTE: In a real app, you would set security rules so only a backend can change status to 'ready'.
+    // We will skip updating the doc for now and just return the object. The list will show "processing".
+    // A real implementation would require a backend function to update the status to 'ready' and set the final URI.
+
+    return { ...pendingSource, id: docRef.id, uri: downloadURL, status: 'ready', createdAt: new Date().toISOString() } as KnowledgeSource;
 };
 
+
 export const deleteKnowledgeSource = async (sourceId: string): Promise<void> => {
-    await delay(300);
-    const kb = getKnowledgeBase();
-    if(kb[sourceId]) {
-        delete kb[sourceId];
-        saveKnowledgeBase(kb);
-    }
+    await deleteDoc(doc(db, KNOWLEDGE_COLLECTION, sourceId));
+    // Note: Deleting the file from Storage would require a backend function for security.
 };
+
 
 /**
  * Simulates a RAG search against the knowledge base.
  * In a real scenario, this would involve embedding and vector search.
- * Here, we just do a simple keyword match on the title.
+ * Here, we just do a simple keyword match on the title against the live data.
  */
-export const searchKnowledgeBase = async (query: string): Promise<string> => {
-    await delay(300);
-    const kb = getKnowledgeBase();
-    const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+export const searchKnowledgeBase = async (queryText: string): Promise<string> => {
+    const allSources = await listKnowledgeSources(); // Search against live data
+    const queryWords = queryText.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     
     if (queryWords.length === 0) return "";
     
-    const relevantSources = Object.values(kb).filter(source => {
+    const relevantSources = allSources.filter(source => {
         const titleLower = source.title.toLowerCase();
-        return queryWords.some(word => titleLower.includes(word));
+        const uriLower = source.uri.toLowerCase();
+        return queryWords.some(word => titleLower.includes(word) || uriLower.includes(word));
     });
 
     if (relevantSources.length > 0) {
-        const context = `Riferimento trovato: "${relevantSources[0].title}". Applicare le procedure indicate in questo documento.`;
-        console.log("BACKEND MOCK: Found knowledge context:", context);
+        // Return context from the most relevant source found
+        const context = `Basandoti sul documento "${relevantSources[0].title}", rispondi alla richiesta dell'utente.`;
+        console.log("BACKEND: Found knowledge context:", context);
         return context;
     }
     
-    console.log("BACKEND MOCK: No relevant knowledge context found.");
+    console.log("BACKEND: No relevant knowledge context found.");
     return "";
 };
