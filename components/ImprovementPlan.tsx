@@ -1,6 +1,5 @@
 import React from 'react';
-// Fix: Removed file extension from import for consistency.
-import { Report } from '../types';
+import { Report } from '../types.ts';
 
 interface ImprovementPlanProps {
   report: Report;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { KnowledgeSource } from '../types';
-import * as apiClient from '../services/apiClient';
+import { KnowledgeSource } from '../types.ts';
+import * as apiClient from '../services/apiClient.ts';
 import {
   TrashIcon,
   SpinnerIcon,
@@ -10,7 +10,7 @@ import {
   DocumentTextIcon,
   SearchIcon,
   PlusIcon
-} from './icons';
+} from './icons.tsx';
 
 interface KnowledgeBaseModalProps {
   isOpen: boolean;

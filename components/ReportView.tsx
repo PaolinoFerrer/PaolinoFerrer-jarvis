@@ -1,7 +1,7 @@
 import React from 'react';
-import { Report, Workplace, Task, Finding } from '../types';
-import ImprovementPlan from './ImprovementPlan';
-import { SaveIcon, DownloadIcon } from './icons';
+import { Report, Workplace, Task, Finding } from '../types.ts';
+import ImprovementPlan from './ImprovementPlan.tsx';
+import { SaveIcon, DownloadIcon } from './icons.tsx';
 
 interface ReportViewProps {
   report: Report;
@@ -159,7 +159,7 @@ const ReportView: React.FC<ReportViewProps> = ({ report, onSave, isLoggedIn }) =
             ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center text-jarvis-text-secondary">
                     <div className="bg-jarvis-bg p-8 rounded-full mb-4">
-                       <svg xmlns="http://www.w.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     </div>
                     <h3 className="text-lg font-semibold text-jarvis-text">Il report è vuoto</h3>
                     <p className="max-w-md mt-1">Inizia a descrivere un ambiente di lavoro o un potenziale rischio nella chat. I rilievi che aggiungerai compariranno qui.</p>

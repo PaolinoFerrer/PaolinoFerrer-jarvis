@@ -1,7 +1,7 @@
-import * as authService from './authService';
-import * as driveService from './googleDriveService';
-import * as backendService from './backendService';
-import * as geminiService from './geminiService';
+import * as authService from './authService.ts';
+import * as driveService from './googleDriveService.ts';
+import * as backendService from './backendService.ts';
+import * as geminiService from './geminiService.ts';
 
 // This file acts as a single point of contact (a facade) for the UI components.
 // It delegates calls to the appropriate services. This makes it much easier

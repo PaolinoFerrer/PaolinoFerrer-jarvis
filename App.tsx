@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChatMessage, Report, User, DriveFile, KnowledgeSource } from './types';
-import ChatInterface from './components/ChatInterface';
-import ReportView from './components/ReportView';
-import UserMenu from './components/UserMenu';
-import ArchiveModal from './components/ArchiveModal';
-import KnowledgeBaseModal from './components/KnowledgeBaseModal';
-import * as apiClient from './services/apiClient';
-import { LogoIcon } from './components/icons';
+import { ChatMessage, Report, User, DriveFile, KnowledgeSource } from './types.ts';
+import ChatInterface from './components/ChatInterface.tsx';
+import ReportView from './components/ReportView.tsx';
+import UserMenu from './components/UserMenu.tsx';
+import ArchiveModal from './components/ArchiveModal.tsx';
+import KnowledgeBaseModal from './components/KnowledgeBaseModal.tsx';
+import * as apiClient from './services/apiClient.ts';
+import { LogoIcon } from './components/icons.tsx';
 
 
 const App: React.FC = () => {

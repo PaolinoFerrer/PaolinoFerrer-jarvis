@@ -1,4 +1,4 @@
-import { User, UserRole } from '../types';
+import { User, UserRole } from '../types.ts';
 
 const AUTH_USER_KEY = 'jarvis-current-user-id';
 

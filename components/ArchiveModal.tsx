@@ -1,7 +1,6 @@
 import React from 'react';
-// Fix: Removed file extensions from imports.
-import { DriveFile } from '../types';
-import { TrashIcon } from './icons';
+import { DriveFile } from '../types.ts';
+import { TrashIcon } from './icons.tsx';
 
 interface ArchiveModalProps {
   isOpen: boolean;

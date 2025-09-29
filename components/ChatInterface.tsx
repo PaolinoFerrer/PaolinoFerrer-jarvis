@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-// Fix: Removed file extensions from imports.
-import { ChatMessage } from '../types';
-import { useVoiceRecognition } from '../hooks/useVoiceRecognition';
-import { MicrophoneIcon, PaperclipIcon, SendIcon, LogoIcon, StopIcon } from './icons';
+import { ChatMessage } from '../types.ts';
+import { useVoiceRecognition } from '../hooks/useVoiceRecognition.ts';
+import { MicrophoneIcon, PaperclipIcon, SendIcon, LogoIcon, StopIcon } from './icons.tsx';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
@@ -36,6 +35,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
       reader.onloadend = () => {
         setPreview(reader.result as string);
       };
+      // FIX: Corrected typo from readDataURL to readAsDataURL
       reader.readAsDataURL(file);
     } else {
       setPreview(null);

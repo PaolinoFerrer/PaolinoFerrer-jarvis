@@ -1,5 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse, Type, Part } from '@google/genai';
-import { Report, ChatMessage } from '../types';
+import { Report, ChatMessage } from '../types.ts';
 
 // Dichiarato ma non inizializzato per evitare crash all'avvio.
 let ai: GoogleGenAI | null = null;
